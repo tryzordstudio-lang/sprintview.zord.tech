@@ -1,6 +1,6 @@
 :root {
-  --font-sans: "Plus Jakarta Sans", sans-serif;
-  --font-mono: "IBM Plex Mono", monospace;
+  --font-sans: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+  --font-mono: "SFMono-Regular", "SF Mono", "Menlo", "Consolas", monospace;
   --bg: #f5f7fb;
   --bg-muted: #eef2f7;
   --surface: #ffffff;
