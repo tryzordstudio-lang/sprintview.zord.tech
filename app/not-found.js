@@ -1,23 +1,32 @@
 import Link from "next/link";
-import { AppShell } from "@/components/app-shell";
+import { SidebarBrandLogo } from "@/components/sidebar-brand-logo";
 
 export default function NotFound() {
   return (
-    <AppShell requireAuth={false}>
-      <main className="report-layout">
-        <section className="surface">
+    <main className="branded-not-found">
+      <div className="branded-not-found-card">
+        <Link href="/" className="landing-brand branded-not-found-brand">
+          <SidebarBrandLogo className="landing-brand-mark" title="Zord SprintView" />
+          <span className="landing-brand-copy">
+            <strong>Zord SprintView</strong>
+            <small>Sprint intelligence workspace</small>
+          </span>
+        </Link>
+
+        <div className="branded-not-found-copy">
           <p className="eyebrow">Page Not Found</p>
-          <h2>That page does not exist.</h2>
+          <h1>That page does not exist.</h1>
           <p className="page-description">
-            The route may have moved, or the report link may no longer be valid.
+            The link may be invalid, the page may have moved, or this route is no longer available.
           </p>
-          <div className="page-actions">
-            <Link href="/app" className="button">
-              Return to Dashboard
-            </Link>
-          </div>
-        </section>
-      </main>
-    </AppShell>
+        </div>
+
+        <div className="page-actions">
+          <Link href="/" className="button">
+            Back to Home
+          </Link>
+        </div>
+      </div>
+    </main>
   );
 }
