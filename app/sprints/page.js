@@ -378,7 +378,7 @@ export default function SprintsPage() {
 
       const diagnostics = collectStoryDiagnostics(form.stories);
       if (fieldErrors.length || diagnostics.rowsWithIssues || !diagnostics.validStories) {
-        throw new Error(fieldErrors[0] || "Resolve story validation issues before analyzing the sprint.");
+        throw new Error(fieldErrors[0] || "Resolve story validation issues before creating the sprint.");
       }
 
       const stories = form.stories
@@ -409,7 +409,7 @@ export default function SprintsPage() {
       };
 
       await apiPost("/sprints/import", payload);
-      setSuccess("Manual sprint created.");
+      setSuccess("Sprint created successfully.");
       setCreateOpen(false);
       setForm(createEmptyForm());
       setSubmitAttempted(false);
@@ -502,8 +502,12 @@ export default function SprintsPage() {
       label: "Actions",
       render: (row) => (
         <div className="table-actions">
-          <button className="table-action" onClick={() => handleRetry(row.sprint?._id)}>
-            Retry AI
+          <button
+            className="table-action"
+            onClick={() => handleRetry(row.sprint?._id)}
+            disabled={!row.sprint?._id || row.sprint?.status === "processing"}
+          >
+            {row.sprint?.status === "processing" ? "Analysing..." : "Analyse Sprint"}
           </button>
           <button className="table-action" onClick={() => setDeleteTarget(row.sprint)}>
             Delete
@@ -524,7 +528,7 @@ export default function SprintsPage() {
       <PageIntro
         eyebrow="Sprint Management"
         title="Sprints"
-        description="Create a sprint manually or review imported sprint health, AI status, and report readiness."
+        description="Create a sprint manually, manage sprint data, and trigger analysis directly from the sprint list."
         actions={
           <>
             <button className="button-secondary" onClick={load}>
@@ -572,7 +576,7 @@ export default function SprintsPage() {
             <div className="manual-sprint-hero">
               <p className="eyebrow">Create Sprint</p>
               <h2>Create Sprint</h2>
-              <p>Configure sprint details, import stories, and generate sprint intelligence.</p>
+              <p>Configure sprint details and import stories to create a new sprint record.</p>
             </div>
 
             <form className="manual-sprint-form" onSubmit={handleCreateSprint}>
@@ -581,7 +585,7 @@ export default function SprintsPage() {
                   <div className="manual-sprint-panel-header">
                     <div>
                       <h3>Sprint Details</h3>
-                      <p>Project metadata, sprint timing, and objective framing for the analysis run.</p>
+                      <p>Project metadata, sprint timing, and objective framing for the sprint record.</p>
                     </div>
                   </div>
 
@@ -806,7 +810,7 @@ export default function SprintsPage() {
                   ) : (
                     <div className="manual-sprint-empty">
                       <strong>No sprint stories yet</strong>
-                      <p>Add stories manually or import a file to begin analysis.</p>
+                      <p>Add stories manually or import a file to create the sprint.</p>
                       <button className="button-secondary" type="button" onClick={addStoryRow}>
                         + Add Story
                       </button>
@@ -860,7 +864,7 @@ export default function SprintsPage() {
                     Cancel
                   </button>
                   <button className="manual-sprint-submit" type="submit" disabled={!canSubmit}>
-                    {submitting ? "Analyzing..." : "Analyze Sprint"}
+                    {submitting ? "Creating..." : "Create Sprint"}
                   </button>
                 </div>
               </div>
