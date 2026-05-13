@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { BarChart, DonutChart, SparklineChart } from "@/components/charts";
 import { InsightCard, KeyValueList, MetricCard, StatusPill, Surface } from "@/components/ui";
-import { apiGet } from "@/lib/api";
+import { apiGet, apiPost } from "@/lib/api";
 import {
   buildAssigneeLoad,
   buildCompletionTrendFromSprints,
@@ -22,6 +22,7 @@ function tabClass(active, value) {
 
 export default function GeneratedReportPage({ params }) {
   const [activeTab, setActiveTab] = useState("summary");
+  const [actionState, setActionState] = useState({ busy: false, message: "", error: "" });
   const [state, setState] = useState({
     loading: true,
     error: "",
@@ -132,11 +133,44 @@ export default function GeneratedReportPage({ params }) {
   ];
 
   async function handleDownload(kind) {
-    if (!report?._id) return;
+    if (!report?._id || sprint?.status !== "ready") return;
     const result = await apiGet(`/report/${report._id}/${kind}`);
     const url = kind === "pdf" ? result?.pdfUrl : result?.wordUrl;
     if (url) {
       window.open(url, "_blank", "noopener,noreferrer");
+    }
+  }
+
+  async function handleAnalyze() {
+    if (!sprint?._id) {
+      return;
+    }
+
+    try {
+      setActionState({ busy: true, message: "", error: "" });
+      await apiPost(`/sprints/${sprint._id}/analyze`, {});
+      setActionState({
+        busy: false,
+        message: "AI analysis started. Report generation is now in progress.",
+        error: ""
+      });
+      const resolvedParams = await params;
+      const [payload, sprintData] = await Promise.all([
+        apiGet(`/report/internal/${resolvedParams.id}`),
+        apiGet("/sprints?limit=7&sortBy=createdAt&sortOrder=desc").catch(() => null)
+      ]);
+      setState({
+        loading: false,
+        error: "",
+        payload,
+        recentSprints: (sprintData?.items || []).map((entry) => entry.sprint).reverse()
+      });
+    } catch (error) {
+      setActionState({
+        busy: false,
+        message: "",
+        error: error.message || "Unable to start report generation."
+      });
     }
   }
 
@@ -154,14 +188,23 @@ export default function GeneratedReportPage({ params }) {
             <p className="eyebrow">AI Report Workspace</p>
             <h1>{sprint?.name || "Report"}</h1>
             <p className="page-description">
-              {sprint?.aiSummary || "Generated sprint reporting for internal review, executive briefing, and stakeholder sharing."}
+              {sprint?.status === "processing"
+                ? "AI is analysing this sprint and generating the report now."
+                : sprint?.status === "imported"
+                  ? "This sprint is saved, but AI reporting has not started yet."
+                  : sprint?.aiSummary || "Generated sprint reporting for internal review, executive briefing, and stakeholder sharing."}
             </p>
           </div>
           <div className="page-actions">
-            <button className="button-secondary" onClick={() => handleDownload("word")} disabled={!report?._id}>
+            {sprint?.status !== "ready" ? (
+              <button className="button" onClick={handleAnalyze} disabled={!sprint?._id || sprint?.status === "processing" || actionState.busy}>
+                {sprint?.status === "processing" ? "Generating..." : actionState.busy ? "Starting..." : "Generate Report"}
+              </button>
+            ) : null}
+            <button className="button-secondary" onClick={() => handleDownload("word")} disabled={!report?._id || sprint?.status !== "ready"}>
               Download Word
             </button>
-            <button className="button" onClick={() => handleDownload("pdf")} disabled={!report?._id}>
+            <button className="button" onClick={() => handleDownload("pdf")} disabled={!report?._id || sprint?.status !== "ready"}>
               Download PDF
             </button>
           </div>
@@ -178,6 +221,22 @@ export default function GeneratedReportPage({ params }) {
       </section>
 
       {state.error ? <div className="auth-alert">{state.error}</div> : null}
+      {actionState.error ? <div className="auth-alert">{actionState.error}</div> : null}
+      {actionState.message ? <div className="manual-sprint-success">{actionState.message}</div> : null}
+
+      {sprint?.status === "processing" ? (
+        <div className="simple-dashboard-highlight">
+          <strong>Report generation is in progress</strong>
+          <p>The AI summary, insights, and export files will appear here after processing completes.</p>
+        </div>
+      ) : null}
+
+      {sprint?.status === "imported" ? (
+        <div className="simple-dashboard-highlight">
+          <strong>AI report has not started yet</strong>
+          <p>Use Generate Report to manually start analysis, insight creation, and report generation for this sprint.</p>
+        </div>
+      ) : null}
 
       <section className="report-executive-grid">
         <Surface title="Executive Summary" subtitle={sprint?.goal || "No sprint goal recorded."}>

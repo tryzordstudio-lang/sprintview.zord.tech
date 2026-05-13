@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmDialog, MetricCard, PageIntro, StatusPill, Surface } from "@/components/ui";
-import { apiGet, apiPatch } from "@/lib/api";
+import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { formatDate } from "@/lib/view-models";
 
 function truncate(value, maxLength = 120) {
@@ -18,17 +18,28 @@ function truncate(value, maxLength = 120) {
 
 export default function ReportsPage() {
   const [rows, setRows] = useState([]);
+  const [sprints, setSprints] = useState([]);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(true);
   const [statusBusy, setStatusBusy] = useState(false);
   const [statusTarget, setStatusTarget] = useState(null);
+  const [actionSprintId, setActionSprintId] = useState("");
 
   async function load() {
     try {
+      setLoading(true);
       setError("");
-      const result = await apiGet("/report?limit=20&sortBy=updatedAt&sortOrder=desc");
-      setRows(result?.items || []);
+      const [reportResult, sprintResult] = await Promise.all([
+        apiGet("/report?limit=20&sortBy=updatedAt&sortOrder=desc"),
+        apiGet("/sprints?limit=20&sortBy=createdAt&sortOrder=desc")
+      ]);
+      setRows(reportResult?.items || []);
+      setSprints(sprintResult?.items || []);
     } catch (loadError) {
       setError(loadError.message || "Unable to load reports.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -65,19 +76,39 @@ export default function ReportsPage() {
     }
   }
 
+  async function handleAnalyze(sprintId) {
+    if (!sprintId) {
+      return;
+    }
+
+    try {
+      setActionSprintId(sprintId);
+      setError("");
+      setSuccess("");
+      await apiPost(`/sprints/${sprintId}/analyze`, {});
+      setSuccess("AI analysis started. Report generation is now in progress.");
+      await load();
+    } catch (actionError) {
+      setError(actionError.message || "Unable to start report generation.");
+    } finally {
+      setActionSprintId("");
+    }
+  }
+
   const publishedCount = rows.filter((row) => row.report?.status === "published").length;
   const draftCount = rows.filter((row) => row.report?.status !== "published").length;
+  const processingCount = sprints.filter((row) => row.sprint?.status === "processing").length;
   const averageHealth = rows.length
     ? Math.round(rows.reduce((sum, row) => sum + Number(row.sprint?.healthScore || 0), 0) / rows.length)
     : 0;
-  const attentionCount = rows.filter(
-    (row) =>
-      row.sprint?.deliveryRisk === "high" ||
-      Number(row.sprint?.metrics?.blocked || 0) > 0 ||
-      row.report?.status !== "published"
-  ).length;
-  const latestReport = rows[0] || null;
-  const latestPublished = rows.find((row) => row.report?.status === "published") || null;
+  const latestReadyReport = rows.find((row) => row.sprint?.status === "ready") || null;
+  const latestPublished = rows.find((row) => row.report?.status === "published" && row.sprint?.status === "ready") || null;
+  const reportBySprintId = new Map(rows.map((row) => [row?.sprint?._id, row]));
+  const queueRows = sprints.map((entry) => ({
+    sprint: entry.sprint,
+    project: entry.project,
+    report: reportBySprintId.get(entry?.sprint?._id)?.report || null
+  }));
   const libraryMetrics = [
     {
       label: "Published Reports",
@@ -99,17 +130,17 @@ export default function ReportsPage() {
       tone: averageHealth >= 75 ? "healthy" : averageHealth >= 55 ? "warning" : "risk"
     },
     {
-      label: "Attention Required",
-      value: String(attentionCount),
-      detail: attentionCount ? "Reports with risk, blockers, or pending publication" : "No immediate report escalations",
-      tone: attentionCount ? "risk" : "healthy"
+      label: "Generation Queue",
+      value: String(processingCount),
+      detail: processingCount ? "Reports currently being prepared by AI" : "No report generation in progress",
+      tone: processingCount ? "warning" : "healthy"
     }
   ];
   const controlCards = [
     {
       label: "Executive Narrative",
-      title: latestReport?.sprint?.name || "No active sprint report",
-      detail: truncate(latestReport?.sprint?.aiSummary || "AI-generated board summaries appear here after sprint analysis completes.")
+      title: latestReadyReport?.sprint?.name || "No active sprint report",
+      detail: truncate(latestReadyReport?.sprint?.aiSummary || "AI-generated board summaries appear here after sprint analysis completes.")
     },
     {
       label: "Governance",
@@ -132,20 +163,33 @@ export default function ReportsPage() {
       <PageIntro
         eyebrow="AI Report Studio"
         title="Reports"
-        description="Modern, AI-generated sprint reporting for internal review, stakeholder distribution, and enterprise-ready export workflows."
+        description="Generate reports only when you want them. Save or import sprints first, then manually start AI reporting from this workspace."
         actions={
           <>
-            {latestReport?.report?._id ? (
-              <Link href={`/reports/${latestReport.report._id}`} className="button">
+            {latestReadyReport?.report?._id ? (
+              <Link href={`/reports/${latestReadyReport.report._id}`} className="button">
                 Open Latest Report
               </Link>
             ) : null}
-            <button className="button-secondary" onClick={load}>Refresh</button>
+            <button className="button-secondary" onClick={load} disabled={loading}>
+              {loading ? "Refreshing..." : "Refresh"}
+            </button>
           </>
         }
       />
 
       {error ? <div className="auth-alert">{error}</div> : null}
+      {success ? <div className="manual-sprint-success">{success}</div> : null}
+
+      {processingCount ? (
+        <div className="simple-dashboard-highlight">
+          <strong>Report generation is in progress</strong>
+          <p>
+            {processingCount} sprint{processingCount === 1 ? "" : "s"} {processingCount === 1 ? "is" : "are"} being analysed now.
+            The report workspace and exports will update automatically after AI finishes.
+          </p>
+        </div>
+      ) : null}
 
       <section className="surface-grid metrics">
         {libraryMetrics.map((item) => (
@@ -171,8 +215,8 @@ export default function ReportsPage() {
                   Open Public Report
                 </Link>
               ) : null}
-              {latestReport?.report?._id ? (
-                <Link href={`/reports/${latestReport.report._id}`} className="button-secondary">
+              {latestReadyReport?.report?._id ? (
+                <Link href={`/reports/${latestReadyReport.report._id}`} className="button-secondary">
                   Review AI Brief
                 </Link>
               ) : null}
@@ -197,6 +241,102 @@ export default function ReportsPage() {
             </div>
           </div>
         </div>
+      </Surface>
+
+      <Surface
+        title="Report Generation Queue"
+        subtitle="Use this queue to start AI report generation only when you want insights, summaries, and exports."
+      >
+        {queueRows.length ? (
+          <div className="report-library-list">
+            {queueRows.map((row, index) => (
+              <article key={row.sprint?._id || index} className="report-library-row">
+                <div className="report-library-row-copy">
+                  <div className="table-badge-row">
+                    <StatusPill
+                      tone={
+                        row.sprint?.status === "ready"
+                          ? "ready"
+                          : row.sprint?.status === "failed"
+                            ? "failed"
+                            : row.sprint?.status === "imported"
+                              ? "draft"
+                              : "processing"
+                      }
+                    >
+                      {row.sprint?.status === "imported"
+                        ? "awaiting ai"
+                        : row.sprint?.status === "processing"
+                          ? "generating"
+                          : row.sprint?.status || "processing"}
+                    </StatusPill>
+                    <StatusPill tone={row.sprint?.deliveryRisk || "default"}>
+                      {row.sprint?.deliveryRisk ? `${row.sprint.deliveryRisk} risk` : "risk pending"}
+                    </StatusPill>
+                  </div>
+                  <strong>{row.sprint?.name || "Untitled sprint"}</strong>
+                  <span>{row.project?.name || "Unassigned project"}</span>
+                  <p className="report-summary-snippet">
+                    {row.sprint?.status === "processing"
+                      ? "AI is generating the insight pack and report now."
+                      : row.sprint?.status === "ready"
+                        ? row.sprint?.aiSummary || "AI analysis completed. Open the report workspace or export the pack."
+                        : row.sprint?.status === "failed"
+                          ? "The previous report generation failed. Start it again when ready."
+                          : "This sprint is saved without AI output. Start report generation only when you need the briefing."}
+                  </p>
+                </div>
+
+                <div className="report-library-strip">
+                  <div className="report-library-mini">
+                    <span>Created</span>
+                    <strong>{formatDate(row.sprint?.createdAt)}</strong>
+                  </div>
+                  <div className="report-library-mini">
+                    <span>Stories</span>
+                    <strong>{row.sprint?.metrics?.totalStories || 0}</strong>
+                  </div>
+                  <div className="report-library-mini">
+                    <span>Health</span>
+                    <strong>{row.sprint?.healthScore || 0}/100</strong>
+                  </div>
+                  <div className="report-library-mini">
+                    <span>Report</span>
+                    <strong>{row.report?._id ? "Ready" : "Not started"}</strong>
+                  </div>
+                </div>
+
+                <div className="report-library-row-actions">
+                  <button
+                    className="table-action"
+                    onClick={() => handleAnalyze(row.sprint?._id)}
+                    disabled={!row.sprint?._id || row.sprint?.status === "processing" || actionSprintId === row.sprint?._id}
+                  >
+                    {row.sprint?.status === "processing"
+                      ? "Generating..."
+                      : actionSprintId === row.sprint?._id
+                        ? "Starting..."
+                        : row.sprint?.status === "ready"
+                          ? "Re-generate Report"
+                          : row.sprint?.status === "failed"
+                            ? "Retry Generation"
+                            : "Generate Insights & Report"}
+                  </button>
+                  {row.report?._id && row.sprint?.status === "ready" ? (
+                    <Link href={`/reports/${row.report._id}`} className="table-action">
+                      Open Report
+                    </Link>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="simple-dashboard-empty">
+            <strong>No sprints available for report generation</strong>
+            <p>Create or import a sprint first, then start AI reporting manually from this page.</p>
+          </div>
+        )}
       </Surface>
 
       <Surface title="Report Library" subtitle="Published and draft report states with clean governance-ready actions.">
@@ -246,14 +386,15 @@ export default function ReportsPage() {
                       Public View
                     </Link>
                   ) : null}
-                  <button className="table-action" onClick={() => handlePdf(row.report?._id)}>
+                  <button className="table-action" onClick={() => handlePdf(row.report?._id)} disabled={row.sprint?.status !== "ready"}>
                     Export PDF
                   </button>
-                  <button className="table-action" onClick={() => handleWord(row.report?._id)}>
+                  <button className="table-action" onClick={() => handleWord(row.report?._id)} disabled={row.sprint?.status !== "ready"}>
                     Export Word
                   </button>
                   <button
                     className="table-action"
+                    disabled={row.sprint?.status !== "ready"}
                     onClick={() =>
                       setStatusTarget({
                         reportId: row.report?._id,
@@ -271,7 +412,7 @@ export default function ReportsPage() {
         ) : (
           <div className="simple-dashboard-empty">
             <strong>No reports yet</strong>
-            <p>Create or import a sprint first to generate AI reporting and stakeholder export packs.</p>
+            <p>Create or import a sprint first, then click Generate Insights & Report to create the first report pack.</p>
           </div>
         )}
       </Surface>

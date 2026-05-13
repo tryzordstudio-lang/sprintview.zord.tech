@@ -186,7 +186,25 @@ export default function SprintsPage() {
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState("");
   const [form, setForm] = useState(createEmptyForm);
+  const [analyzingSprintId, setAnalyzingSprintId] = useState("");
   const fileInputRef = useRef(null);
+
+  function openCreateSprint() {
+    setError("");
+    setSuccess("");
+    setSubmitAttempted(false);
+    setCreateOpen(true);
+    setForm({
+      ...createEmptyForm(),
+      stories: [createStoryRow()]
+    });
+    setDraftSavedAt("");
+    try {
+      window.localStorage.removeItem(MANUAL_SPRINT_DRAFT_KEY);
+    } catch (_error) {
+      // Ignore localStorage errors.
+    }
+  }
 
   async function load() {
     try {
@@ -409,7 +427,7 @@ export default function SprintsPage() {
       };
 
       await apiPost("/sprints/import", payload);
-      setSuccess("Sprint created successfully.");
+      setSuccess("Sprint created. Run Generate Insights & Report when you want AI analysis to start.");
       setCreateOpen(false);
       setForm(createEmptyForm());
       setSubmitAttempted(false);
@@ -423,9 +441,19 @@ export default function SprintsPage() {
     }
   }
 
-  async function handleRetry(id) {
-    await apiPost(`/sprints/${id}/retry-ai`, {});
-    await load();
+  async function handleAnalyze(id) {
+    try {
+      setAnalyzingSprintId(id);
+      setError("");
+      setSuccess("");
+      await apiPost(`/sprints/${id}/analyze`, {});
+      setSuccess("AI analysis started. Insights and report generation are now in progress.");
+      await load();
+    } catch (analyzeError) {
+      setError(analyzeError.message || "Unable to start AI analysis.");
+    } finally {
+      setAnalyzingSprintId("");
+    }
   }
 
   async function handleDeleteConfirm() {
@@ -446,17 +474,10 @@ export default function SprintsPage() {
   const sprintCount = pagination?.total || rows.length;
   const readyReports = rows.filter((row) => row.report?.status === "published").length;
   const processingCount = rows.filter((row) => row.sprint?.status === "processing").length;
+  const awaitingAnalysisCount = rows.filter((row) => row.sprint?.status === "imported").length;
   const storyDiagnostics = collectStoryDiagnostics(form.stories);
   const snapshot = buildRiskPreview(form.stories);
   const hasDateError = form.startDate && form.endDate && new Date(form.startDate) > new Date(form.endDate);
-  const canSubmit =
-    !submitting &&
-    form.projectName.trim() &&
-    form.sprintName.trim() &&
-    !hasDateError &&
-    storyDiagnostics.validStories > 0 &&
-    storyDiagnostics.rowsWithIssues === 0;
-
   const columns = [
     {
       key: "name",
@@ -492,8 +513,22 @@ export default function SprintsPage() {
       key: "status",
       label: "Status",
       render: (row) => (
-        <StatusPill tone={row.sprint?.status === "ready" ? "ready" : row.sprint?.status === "failed" ? "failed" : "processing"}>
-          {row.sprint?.status || "processing"}
+        <StatusPill
+          tone={
+            row.sprint?.status === "ready"
+              ? "ready"
+              : row.sprint?.status === "failed"
+                ? "failed"
+                : row.sprint?.status === "imported"
+                  ? "draft"
+                  : "processing"
+          }
+        >
+          {row.sprint?.status === "imported"
+            ? "awaiting ai"
+            : row.sprint?.status === "processing"
+              ? "analysing"
+              : row.sprint?.status || "processing"}
         </StatusPill>
       )
     },
@@ -504,10 +539,18 @@ export default function SprintsPage() {
         <div className="table-actions">
           <button
             className="table-action"
-            onClick={() => handleRetry(row.sprint?._id)}
-            disabled={!row.sprint?._id || row.sprint?.status === "processing"}
+            onClick={() => handleAnalyze(row.sprint?._id)}
+            disabled={!row.sprint?._id || row.sprint?.status === "processing" || analyzingSprintId === row.sprint?._id}
           >
-            {row.sprint?.status === "processing" ? "Analysing..." : "Analyse Sprint"}
+            {row.sprint?.status === "processing"
+              ? "Analysing..."
+              : analyzingSprintId === row.sprint?._id
+                ? "Starting..."
+                : row.sprint?.status === "ready"
+                  ? "Re-run AI"
+                  : row.sprint?.status === "failed"
+                    ? "Retry AI"
+                    : "Generate Insights & Report"}
           </button>
           <button className="table-action" onClick={() => setDeleteTarget(row.sprint)}>
             Delete
@@ -528,13 +571,13 @@ export default function SprintsPage() {
       <PageIntro
         eyebrow="Sprint Management"
         title="Sprints"
-        description="Create a sprint manually, manage sprint data, and trigger analysis directly from the sprint list."
+        description="Create a sprint first, review the scope, and only start AI analysis when you want insights and report generation."
         actions={
           <>
             <button className="button-secondary" onClick={load}>
               Refresh
             </button>
-            <button className="button" onClick={() => setCreateOpen(true)}>
+            <button className="button" onClick={openCreateSprint}>
               Create New Sprint
             </button>
           </>
@@ -547,8 +590,38 @@ export default function SprintsPage() {
       <section className="surface-grid three-up">
         <MetricCard label="Tracked Sprints" value={String(sprintCount)} unit="" detail="Imported into this workspace" />
         <MetricCard label="Ready Reports" value={String(readyReports)} unit="" detail="Published reports available" tone="healthy" />
-        <MetricCard label="AI Processing" value={String(processingCount)} unit="" detail="Sprints waiting on AI completion" tone="warning" />
+        <MetricCard
+          label="Awaiting AI"
+          value={String(awaitingAnalysisCount + processingCount)}
+          unit=""
+          detail={
+            processingCount
+              ? `${processingCount} in progress • ${awaitingAnalysisCount} waiting to start`
+              : `${awaitingAnalysisCount} sprints waiting for manual AI analysis`
+          }
+          tone={awaitingAnalysisCount + processingCount ? "warning" : "healthy"}
+        />
       </section>
+
+      {processingCount ? (
+        <div className="simple-dashboard-highlight">
+          <strong>AI analysis is running</strong>
+          <p>
+            {processingCount} sprint{processingCount === 1 ? "" : "s"} {processingCount === 1 ? "is" : "are"} being analysed now.
+            Insights and reports will appear automatically when processing completes.
+          </p>
+        </div>
+      ) : null}
+
+      {awaitingAnalysisCount ? (
+        <div className="simple-dashboard-highlight">
+          <strong>Saved without AI analysis</strong>
+          <p>
+            {awaitingAnalysisCount} sprint{awaitingAnalysisCount === 1 ? "" : "s"} {awaitingAnalysisCount === 1 ? "is" : "are"} ready for
+            manual review. Use the action column to generate insights and the report only when needed.
+          </p>
+        </div>
+      ) : null}
 
       <Surface title="Sprint Registry" subtitle="Sortable, searchable, and scoped for enterprise operating review.">
         <DataTable columns={columns} rows={rows} />
@@ -576,7 +649,7 @@ export default function SprintsPage() {
             <div className="manual-sprint-hero">
               <p className="eyebrow">Create Sprint</p>
               <h2>Create Sprint</h2>
-              <p>Configure sprint details and import stories to create a new sprint record.</p>
+              <p>Create the sprint record now. AI analysis, insights, and report generation start only after you trigger them manually.</p>
             </div>
 
             <form className="manual-sprint-form" onSubmit={handleCreateSprint}>
@@ -851,7 +924,9 @@ export default function SprintsPage() {
               </div>
 
               <div className="manual-sprint-footer">
-                <div className="manual-sprint-footer-note">{draftSavedAt || "Draft auto-saved locally"}</div>
+                <div className="manual-sprint-footer-note">
+                  {draftSavedAt || "Draft auto-saved locally"} • Creating the sprint does not start AI automatically.
+                </div>
                 <div className="manual-sprint-footer-actions">
                   <button
                     className="button-secondary"
@@ -863,7 +938,7 @@ export default function SprintsPage() {
                   >
                     Cancel
                   </button>
-                  <button className="manual-sprint-submit" type="submit" disabled={!canSubmit}>
+                  <button className="manual-sprint-submit" type="submit" disabled={submitting}>
                     {submitting ? "Creating..." : "Create Sprint"}
                   </button>
                 </div>
