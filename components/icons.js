@@ -171,6 +171,54 @@ export function Icon({ name, className = "" }) {
           <path d="m7 10 5 5 5-5" />
         </svg>
       );
+    case "open":
+      return (
+        <svg {...props}>
+          <path d="M14 5h5v5" />
+          <path d="M10 14 19 5" />
+          <path d="M19 13v4.5A1.5 1.5 0 0 1 17.5 19h-11A1.5 1.5 0 0 1 5 17.5v-11A1.5 1.5 0 0 1 6.5 5H11" />
+        </svg>
+      );
+    case "ai":
+      return (
+        <svg {...props}>
+          <path d="m12 3 1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3Z" />
+          <path d="m18.5 15 .9 2 .1.1 2 .9-2 .9-.1.1-.9 2-.9-2-.1-.1-2-.9 2-.9.1-.1.9-2Z" />
+          <path d="m5.5 14 .7 1.5.1.1 1.5.7-1.5.7-.1.1-.7 1.5-.7-1.5-.1-.1-1.5-.7 1.5-.7.1-.1.7-1.5Z" />
+        </svg>
+      );
+    case "trash":
+      return (
+        <svg {...props}>
+          <path d="M4.5 7.5h15" />
+          <path d="M9.5 4.5h5" />
+          <path d="M7 7.5l.8 11a1.5 1.5 0 0 0 1.5 1.4h5.4a1.5 1.5 0 0 0 1.5-1.4l.8-11" />
+          <path d="M10 11v5" />
+          <path d="M14 11v5" />
+        </svg>
+      );
+    case "check":
+      return (
+        <svg {...props}>
+          <path d="m5 12 4.2 4.2L19 6.5" />
+        </svg>
+      );
+    case "alert":
+      return (
+        <svg {...props}>
+          <path d="M12 8v5" />
+          <path d="M12 16.5h.01" />
+          <path d="m10.3 4.9-6.2 10.7A1.3 1.3 0 0 0 5.2 17.5h13.6a1.3 1.3 0 0 0 1.1-1.9L13.7 4.9a1.3 1.3 0 0 0-2.4 0Z" />
+        </svg>
+      );
+    case "info":
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="8" />
+          <path d="M12 10v5" />
+          <path d="M12 7.5h.01" />
+        </svg>
+      );
     default:
       return (
         <svg {...props}>

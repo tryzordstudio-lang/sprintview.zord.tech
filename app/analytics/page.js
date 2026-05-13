@@ -61,7 +61,6 @@ export default function AnalyticsPage() {
         eyebrow="Trend Analytics"
         title="Analytics"
         description="A calm, enterprise-grade analytics layer focused on delivery confidence and sprint system behavior."
-        actions={<span className="button-secondary">Live backend data</span>}
       />
 
       {state.error ? <div className="auth-alert">{state.error}</div> : null}

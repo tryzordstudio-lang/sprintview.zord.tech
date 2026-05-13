@@ -1,11 +1,5 @@
-import { LoadingLogo } from "@/components/loading-logo";
+import { AppLoadingScreen } from "@/components/app-loading-screen";
 
 export default function Loading() {
-  return (
-    <main className="simple-loading-screen">
-      <div className="brand-loading-stage">
-        <LoadingLogo />
-      </div>
-    </main>
-  );
+  return <AppLoadingScreen />;
 }

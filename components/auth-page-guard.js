@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LoadingLogo } from "@/components/loading-logo";
+import { AppLoadingScreen } from "@/components/app-loading-screen";
 import { apiGet } from "@/lib/api";
 
 export function AuthPageGuard({ children }) {
@@ -38,13 +38,7 @@ export function AuthPageGuard({ children }) {
   }, [router]);
 
   if (!resolved) {
-    return (
-      <main className="simple-loading-screen">
-        <div className="brand-loading-stage">
-          <LoadingLogo />
-        </div>
-      </main>
-    );
+    return <AppLoadingScreen />;
   }
 
   return children;

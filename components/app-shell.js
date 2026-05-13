@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { AppLoadingScreen } from "@/components/app-loading-screen";
 import { Icon } from "@/components/icons";
-import { LoadingLogo } from "@/components/loading-logo";
 import { SidebarBrandLogo } from "@/components/sidebar-brand-logo";
 import { apiGet, apiPost } from "@/lib/api";
 import { buildNotifications } from "@/lib/view-models";
@@ -20,6 +20,86 @@ const navItems = [
 
 const bottomNavItem = { href: "/settings", label: "Settings", icon: "settings", section: "Administration" };
 
+function getSearchContext(pathname) {
+  if (pathname.startsWith("/sprints")) {
+    return {
+      scope: "sprints",
+      placeholder: "Search sprints...",
+      ariaLabel: "Search sprints"
+    };
+  }
+
+  if (pathname.startsWith("/reports") || pathname.startsWith("/report/")) {
+    return {
+      scope: "reports",
+      placeholder: "Search reports...",
+      ariaLabel: "Search reports"
+    };
+  }
+
+  if (pathname.startsWith("/insights")) {
+    return {
+      scope: "insights",
+      placeholder: "Search insight sprints...",
+      ariaLabel: "Search insight sprints"
+    };
+  }
+
+  if (pathname.startsWith("/analytics")) {
+    return {
+      scope: "analytics",
+      placeholder: "Search sprint analytics...",
+      ariaLabel: "Search sprint analytics"
+    };
+  }
+
+  if (pathname.startsWith("/integrations") || pathname.startsWith("/settings")) {
+    return {
+      scope: "admin",
+      placeholder: "Search admin pages...",
+      ariaLabel: "Search admin pages"
+    };
+  }
+
+  return {
+    scope: "overview",
+    placeholder: "Search overview...",
+    ariaLabel: "Search overview"
+  };
+}
+
+function buildScopedSearchResults({ scope, sprintEntries = [], reportEntries = [], navEntries = [] }) {
+  const sprintMatches = sprintEntries.map((entry, index) => ({
+    id: `sprint-${entry.sprint?._id || index}`,
+    label: entry.sprint?.name || "Sprint",
+    meta: entry.project?.name || "Sprint",
+    href: entry.sprint?._id ? `/sprints/${entry.sprint._id}` : "/sprints",
+    kind: scope === "insights" ? "Insight Sprint" : scope === "analytics" ? "Analytics Sprint" : "Sprint"
+  }));
+
+  const reportMatches = reportEntries.map((entry, index) => ({
+    id: `report-${entry.report?._id || index}`,
+    label: entry.sprint?.name || "Report",
+    meta: entry.project?.name || "Report",
+    href: entry.report?._id ? `/reports/${entry.report._id}` : "/reports",
+    kind: "Report"
+  }));
+
+  switch (scope) {
+    case "sprints":
+    case "insights":
+    case "analytics":
+      return sprintMatches;
+    case "reports":
+      return reportMatches;
+    case "admin":
+      return navEntries;
+    case "overview":
+    default:
+      return [...sprintMatches, ...reportMatches];
+  }
+}
+
 function truncateText(value, maxLength) {
   const normalized = String(value || "").trim();
   if (normalized.length <= maxLength) {
@@ -34,14 +114,17 @@ export function AppShell({ children, requireAuth = true, publicHeader = null, ba
   const router = useRouter();
   const searchShellRef = useRef(null);
   const notificationPanelRef = useRef(null);
+  const toastTimersRef = useRef(new Map());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
+  const [minimumLoaderComplete, setMinimumLoaderComplete] = useState(false);
   const [sessionResolved, setSessionResolved] = useState(false);
   const [session, setSession] = useState(null);
   const [notifications, setNotifications] = useState([]);
+  const [shellToasts, setShellToasts] = useState([]);
   const currentItem =
     [...navItems, bottomNavItem].find((item) => item.href === pathname) ||
     [...navItems, bottomNavItem].find((item) => pathname.startsWith(item.href)) ||
@@ -50,12 +133,24 @@ export function AppShell({ children, requireAuth = true, publicHeader = null, ba
     section,
     items: navItems.filter((item) => item.section === section)
   }));
+  const searchContext = getSearchContext(pathname);
 
   useEffect(() => {
     setSidebarOpen(false);
     setNotificationsOpen(false);
     setSearchFocused(false);
     setSearchQuery("");
+  }, [pathname]);
+
+  useEffect(() => {
+    setMinimumLoaderComplete(false);
+    const timer = window.setTimeout(() => {
+      setMinimumLoaderComplete(true);
+    }, 2000);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [pathname]);
 
   useEffect(() => {
@@ -85,6 +180,43 @@ export function AppShell({ children, requireAuth = true, publicHeader = null, ba
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleShellNotification(event) {
+      const detail = event.detail || {};
+      if (!detail.message) {
+        return;
+      }
+
+      const toast = {
+        id: detail.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        type: detail.type || "info",
+        title: detail.title || "",
+        message: detail.message
+      };
+
+      setShellToasts((current) => [...current, toast].slice(-4));
+
+      if (!detail.persist) {
+        const timer = window.setTimeout(() => {
+          setShellToasts((current) => current.filter((item) => item.id !== toast.id));
+          toastTimersRef.current.delete(toast.id);
+        }, toast.type === "error" ? 6500 : 4200);
+
+        toastTimersRef.current.set(toast.id, timer);
+      }
+    }
+
+    window.addEventListener("sprintview:notify", handleShellNotification);
+
+    return () => {
+      window.removeEventListener("sprintview:notify", handleShellNotification);
+      for (const timer of toastTimersRef.current.values()) {
+        window.clearTimeout(timer);
+      }
+      toastTimersRef.current.clear();
     };
   }, []);
 
@@ -134,6 +266,7 @@ export function AppShell({ children, requireAuth = true, publicHeader = null, ba
           apiGet("/sprints?limit=6&sortBy=createdAt&sortOrder=desc"),
           apiGet("/report?limit=6&sortBy=updatedAt&sortOrder=desc")
         ]);
+        const sprints = (sprintData?.items || []).map((entry) => entry.sprint).filter(Boolean);
 
         const latestSprintId = sprintData?.items?.[0]?.sprint?._id;
         const latestSprintDetail = latestSprintId ? await apiGet(`/sprints/${latestSprintId}`) : null;
@@ -144,6 +277,7 @@ export function AppShell({ children, requireAuth = true, publicHeader = null, ba
 
         setNotifications(
           buildNotifications({
+            sprints,
             latestSprint: latestSprintDetail?.sprint,
             reports: reportData?.items || []
           })
@@ -158,11 +292,13 @@ export function AppShell({ children, requireAuth = true, publicHeader = null, ba
     }
 
     loadNotifications();
+    window.addEventListener("sprintview:notifications-refresh", loadNotifications);
 
     return () => {
       active = false;
+      window.removeEventListener("sprintview:notifications-refresh", loadNotifications);
     };
-  }, [requireAuth, session?.user?.workspaceId]);
+  }, [requireAuth, session?.user?.workspaceId, pathname]);
 
   useEffect(() => {
     if (!requireAuth || !session?.user?.workspaceId) {
@@ -174,49 +310,47 @@ export function AppShell({ children, requireAuth = true, publicHeader = null, ba
 
     async function loadSearchResults() {
       try {
-        const [sprintData, reportData] = await Promise.all([
-          apiGet("/sprints?limit=8&sortBy=updatedAt&sortOrder=desc"),
-          apiGet("/report?limit=8&sortBy=updatedAt&sortOrder=desc")
-        ]);
+        const needSprints = ["overview", "sprints", "insights", "analytics"].includes(searchContext.scope);
+        const needReports = ["overview", "reports"].includes(searchContext.scope);
+        const requests = [
+          needSprints ? apiGet("/sprints?limit=8&sortBy=updatedAt&sortOrder=desc") : Promise.resolve(null),
+          needReports ? apiGet("/report?limit=8&sortBy=updatedAt&sortOrder=desc") : Promise.resolve(null)
+        ];
+        const [sprintData, reportData] = await Promise.all(requests);
 
         if (!active) {
           return;
         }
 
-        const navMatches = [...navItems, bottomNavItem].map((item) => ({
+        const navMatches = [...navItems, bottomNavItem]
+          .filter((item) => item.section === "Administration")
+          .map((item) => ({
           id: `nav-${item.href}`,
           label: item.label,
           meta: item.section,
           href: item.href,
           kind: "Navigation"
         }));
-        const sprintMatches = (sprintData?.items || []).map((entry, index) => ({
-          id: `sprint-${entry.sprint?._id || index}`,
-          label: entry.sprint?.name || "Sprint",
-          meta: entry.project?.name || "Sprint",
-          href: entry.report?._id ? `/reports/${entry.report._id}` : "/sprints",
-          kind: entry.report?._id ? "Sprint Report" : "Sprint"
-        }));
-        const reportMatches = (reportData?.items || []).map((entry, index) => ({
-          id: `report-${entry.report?._id || index}`,
-          label: entry.sprint?.name || "Report",
-          meta: entry.project?.name || "Report",
-          href: entry.report?._id ? `/reports/${entry.report._id}` : "/reports",
-          kind: "Report"
-        }));
 
-        setSearchResults([...navMatches, ...sprintMatches, ...reportMatches]);
+        setSearchResults(
+          buildScopedSearchResults({
+            scope: searchContext.scope,
+            sprintEntries: sprintData?.items || [],
+            reportEntries: reportData?.items || [],
+            navEntries: navMatches
+          })
+        );
       } catch (_error) {
         if (active) {
-          setSearchResults(
-            navItems.map((item) => ({
+          setSearchResults(searchContext.scope === "admin" ? [...navItems, bottomNavItem]
+            .filter((item) => item.section === "Administration")
+            .map((item) => ({
               id: `nav-${item.href}`,
               label: item.label,
               meta: item.section,
               href: item.href,
               kind: "Navigation"
-            }))
-          );
+            })) : []);
         }
       }
     }
@@ -226,16 +360,10 @@ export function AppShell({ children, requireAuth = true, publicHeader = null, ba
     return () => {
       active = false;
     };
-  }, [requireAuth, session?.user?.workspaceId]);
+  }, [requireAuth, session?.user?.workspaceId, searchContext.scope]);
 
-  if (requireAuth && !sessionResolved) {
-    return (
-      <main className="simple-loading-screen">
-        <div className="brand-loading-stage">
-          <LoadingLogo />
-        </div>
-      </main>
-    );
+  if (!minimumLoaderComplete || (requireAuth && !sessionResolved)) {
+    return <AppLoadingScreen />;
   }
 
   if (requireAuth && !session) {
@@ -428,11 +556,11 @@ export function AppShell({ children, requireAuth = true, publicHeader = null, ba
 
             <div className="topbar-center">
               <form ref={searchShellRef} className="search-shell" onSubmit={handleSearchSubmit}>
-                <label className="search-field" aria-label="Search reports and sprints">
+                <label className="search-field" aria-label={searchContext.ariaLabel}>
                   <Icon name="search" className="icon" />
                   <input
                     type="search"
-                    placeholder="Search reports, sprints, teams..."
+                    placeholder={searchContext.placeholder}
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
                     onFocus={() => setSearchFocused(true)}
@@ -463,7 +591,7 @@ export function AppShell({ children, requireAuth = true, publicHeader = null, ba
                         </button>
                       ))
                     ) : (
-                      <div className="search-empty">No matching results.</div>
+                      <div className="search-empty">No matching results in this tab.</div>
                     )}
                   </div>
                 ) : null}
@@ -499,6 +627,40 @@ export function AppShell({ children, requireAuth = true, publicHeader = null, ba
             </div>
           </div>
         </header>
+
+        {shellToasts.length ? (
+          <div className="shell-toast-stack" aria-live="polite" aria-atomic="true">
+            {shellToasts.map((toast) => (
+              <article key={toast.id} className={`shell-toast tone-${toast.type}`} role={toast.type === "error" ? "alert" : "status"}>
+                <span className="shell-toast-icon">
+                  <Icon
+                    name={toast.type === "error" ? "alert" : toast.type === "success" ? "check" : "info"}
+                    className="icon"
+                  />
+                </span>
+                <div className="shell-toast-copy">
+                  {toast.title ? <strong>{toast.title}</strong> : null}
+                  <p>{toast.message}</p>
+                </div>
+                <button
+                  className="shell-toast-close"
+                  type="button"
+                  aria-label="Dismiss notification"
+                  onClick={() => {
+                    const timer = toastTimersRef.current.get(toast.id);
+                    if (timer) {
+                      window.clearTimeout(timer);
+                      toastTimersRef.current.delete(toast.id);
+                    }
+                    setShellToasts((current) => current.filter((item) => item.id !== toast.id));
+                  }}
+                >
+                  <span aria-hidden="true">×</span>
+                </button>
+              </article>
+            ))}
+          </div>
+        ) : null}
 
         <main className="page-content">{children}</main>
       </div>
