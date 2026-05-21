@@ -42,6 +42,7 @@
   --sidebar-text-soft: #96a7c0;
   --sidebar-active: #172745;
   --transition-standard: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --sidebar-width: 240px;
 }
 
 html[data-theme="dark"] {
@@ -829,7 +830,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  width: 280px;
+  width: var(--sidebar-width);
   height: 100vh;
   padding: 16px 16px 18px;
   background: var(--sidebar-bg);
@@ -1009,7 +1010,7 @@ button {
 
 .app-main {
   min-width: 0;
-  margin-left: 280px;
+  margin-left: var(--sidebar-width);
   min-height: 100vh;
   background: var(--bg);
 }
@@ -6088,7 +6089,7 @@ button {
   .sidebar {
     left: 0;
     top: 0;
-    width: min(280px, 86vw);
+    width: min(var(--sidebar-width), 86vw);
     transform: translateX(-100%);
     transition: transform 220ms ease;
   }
@@ -9873,7 +9874,7 @@ button {
 
 /* Let the canvas and page cards stretch gracefully to full width of the parent layout */
 .report-builder-shell:has(.report-builder-canvas) {
-  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr) !important;
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) !important;
   gap: 32px !important;
   align-items: start !important;
   width: 100% !important;
