@@ -36,11 +36,11 @@
   --space-8: 32px;
   --space-12: 48px;
   --content-width: min(1440px, calc(100vw - 48px));
-  --sidebar-bg: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  --sidebar-border: #dbe3ee;
-  --sidebar-text: #0f172a;
-  --sidebar-text-soft: #64748b;
-  --sidebar-active: rgba(26, 115, 232, 0.08);
+  --sidebar-bg: linear-gradient(180deg, #0d1a31 0%, #070b13 100%);
+  --sidebar-border: #16223c;
+  --sidebar-text: #d8e1ef;
+  --sidebar-text-soft: #96a7c0;
+  --sidebar-active: #172745;
   --transition-standard: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -806,7 +806,7 @@ button {
   gap: 8px;
   min-height: 56px;
   padding: 4px 2px 14px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   box-sizing: border-box;
 }
 
@@ -832,14 +832,16 @@ button {
 .sidebar-brand h1 {
   font-size: 1rem;
   font-weight: 700;
-  color: var(--text);
+  color: #f8fbff;
 }
 
 .sidebar-brand-copy p {
   margin: 0;
-  color: var(--text-soft);
+  color: #8aa0c4;
   font-size: 0.857rem;
   font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .eyebrow,
@@ -905,8 +907,8 @@ button {
 .sidebar-link:hover,
 .sidebar-link.is-active {
   color: var(--sidebar-text);
-  background: var(--sidebar-active);
-  border-color: rgba(26, 115, 232, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
 .sidebar-link.is-active::before {
@@ -915,7 +917,7 @@ button {
   inset: 9px auto 9px -2px;
   width: 3px;
   border-radius: 999px;
-  background: var(--primary);
+  background: #5f8dff;
 }
 
 .sidebar-link-icon-wrap {
@@ -925,13 +927,13 @@ button {
   width: 24px;
   height: 24px;
   border-radius: 8px;
-  background: rgba(26, 115, 232, 0.06);
+  background: rgba(255, 255, 255, 0.035);
   flex: 0 0 auto;
   transition: var(--transition-standard);
 }
 
 .sidebar-link.is-active .sidebar-link-icon-wrap {
-  background: rgba(26, 115, 232, 0.12);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .sidebar-link-icon,
@@ -945,7 +947,7 @@ button {
   display: grid;
   gap: 12px;
   padding-top: 12px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .sidebar-link-bottom {
@@ -963,8 +965,8 @@ button {
 
 .sidebar-footer-link:hover {
   color: var(--sidebar-text);
-  border-color: var(--border-strong);
-  background: rgba(26, 115, 232, 0.04);
+  border-color: #2a4571;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .app-main {
@@ -2807,6 +2809,69 @@ button {
 .integration-page-shell {
   display: grid;
   gap: 20px;
+}
+
+.integration-simple-shell {
+  display: grid;
+  gap: 16px;
+  width: min(920px, 100%);
+  margin: 0 auto;
+}
+
+.integration-simple-card {
+  padding: 24px;
+}
+
+.integration-simple-header {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.integration-simple-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.integration-simple-form {
+  gap: 16px;
+}
+
+.integration-simple-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.integration-simple-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.integration-simple-summary {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-light);
+}
+
+.integration-simple-summary span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.integration-simple-summary strong {
+  color: var(--text);
+  font-size: 0.92rem;
 }
 
 .integration-hero {
@@ -6027,6 +6092,14 @@ button {
     border-radius: 24px;
   }
 
+  .integration-simple-shell {
+    width: 100%;
+  }
+
+  .integration-simple-footer {
+    grid-template-columns: 1fr;
+  }
+
   .integration-hero-actions,
   .integration-inline-actions {
     width: 100%;
@@ -6366,6 +6439,15 @@ button {
 
   .integration-hero-actions {
     width: 100%;
+  }
+
+  .integration-simple-card {
+    padding: 18px;
+    border-radius: 20px;
+  }
+
+  .integration-simple-grid {
+    grid-template-columns: 1fr;
   }
 
   .integration-brand-chip {
