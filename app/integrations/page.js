@@ -209,6 +209,12 @@ export default function IntegrationsPage() {
             </div>
           </div>
 
+          <div className="integration-speed-strip" aria-label="Integration workflow">
+            <span>Connect</span>
+            <span>Load boards</span>
+            <span>Import sprint</span>
+          </div>
+
           <div className="builder-panel-stack integration-simple-form">
             <label className="builder-field">
               <span>Jira board</span>

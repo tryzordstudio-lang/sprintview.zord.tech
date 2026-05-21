@@ -120,7 +120,6 @@ export function AppShell({ children, requireAuth = true, publicHeader = null, ba
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
-  const [minimumLoaderComplete, setMinimumLoaderComplete] = useState(false);
   const [sessionResolved, setSessionResolved] = useState(false);
   const [session, setSession] = useState(null);
   const [notifications, setNotifications] = useState([]);
@@ -140,17 +139,6 @@ export function AppShell({ children, requireAuth = true, publicHeader = null, ba
     setNotificationsOpen(false);
     setSearchFocused(false);
     setSearchQuery("");
-  }, [pathname]);
-
-  useEffect(() => {
-    setMinimumLoaderComplete(false);
-    const timer = window.setTimeout(() => {
-      setMinimumLoaderComplete(true);
-    }, 2000);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
   }, [pathname]);
 
   useEffect(() => {
@@ -291,11 +279,12 @@ export function AppShell({ children, requireAuth = true, publicHeader = null, ba
       }
     }
 
-    loadNotifications();
+    const timer = window.setTimeout(loadNotifications, 150);
     window.addEventListener("sprintview:notifications-refresh", loadNotifications);
 
     return () => {
       active = false;
+      window.clearTimeout(timer);
       window.removeEventListener("sprintview:notifications-refresh", loadNotifications);
     };
   }, [requireAuth, session?.user?.workspaceId, pathname]);
@@ -308,41 +297,22 @@ export function AppShell({ children, requireAuth = true, publicHeader = null, ba
 
     let active = true;
 
-    async function loadSearchResults() {
-      try {
-        const needSprints = ["overview", "sprints", "insights", "analytics"].includes(searchContext.scope);
-        const needReports = ["overview", "reports"].includes(searchContext.scope);
-        const requests = [
-          needSprints ? apiGet("/sprints?limit=8&sortBy=updatedAt&sortOrder=desc") : Promise.resolve(null),
-          needReports ? apiGet("/report?limit=8&sortBy=updatedAt&sortOrder=desc") : Promise.resolve(null)
-        ];
-        const [sprintData, reportData] = await Promise.all(requests);
+    const timer = window.setTimeout(() => {
+      async function loadSearchResults() {
+        try {
+          const needSprints = ["overview", "sprints", "insights", "analytics"].includes(searchContext.scope);
+          const needReports = ["overview", "reports"].includes(searchContext.scope);
+          const requests = [
+            needSprints ? apiGet("/sprints?limit=8&sortBy=updatedAt&sortOrder=desc") : Promise.resolve(null),
+            needReports ? apiGet("/report?limit=8&sortBy=updatedAt&sortOrder=desc") : Promise.resolve(null)
+          ];
+          const [sprintData, reportData] = await Promise.all(requests);
 
-        if (!active) {
-          return;
-        }
+          if (!active) {
+            return;
+          }
 
-        const navMatches = [...navItems, bottomNavItem]
-          .filter((item) => item.section === "Administration")
-          .map((item) => ({
-          id: `nav-${item.href}`,
-          label: item.label,
-          meta: item.section,
-          href: item.href,
-          kind: "Navigation"
-        }));
-
-        setSearchResults(
-          buildScopedSearchResults({
-            scope: searchContext.scope,
-            sprintEntries: sprintData?.items || [],
-            reportEntries: reportData?.items || [],
-            navEntries: navMatches
-          })
-        );
-      } catch (_error) {
-        if (active) {
-          setSearchResults(searchContext.scope === "admin" ? [...navItems, bottomNavItem]
+          const navMatches = [...navItems, bottomNavItem]
             .filter((item) => item.section === "Administration")
             .map((item) => ({
               id: `nav-${item.href}`,
@@ -350,19 +320,45 @@ export function AppShell({ children, requireAuth = true, publicHeader = null, ba
               meta: item.section,
               href: item.href,
               kind: "Navigation"
-            })) : []);
+            }));
+
+          setSearchResults(
+            buildScopedSearchResults({
+              scope: searchContext.scope,
+              sprintEntries: sprintData?.items || [],
+              reportEntries: reportData?.items || [],
+              navEntries: navMatches
+            })
+          );
+        } catch (_error) {
+          if (active) {
+            setSearchResults(
+              searchContext.scope === "admin"
+                ? [...navItems, bottomNavItem]
+                    .filter((item) => item.section === "Administration")
+                    .map((item) => ({
+                      id: `nav-${item.href}`,
+                      label: item.label,
+                      meta: item.section,
+                      href: item.href,
+                      kind: "Navigation"
+                    }))
+                : []
+            );
+          }
         }
       }
-    }
 
-    loadSearchResults();
+      loadSearchResults();
+    }, 150);
 
     return () => {
       active = false;
+      window.clearTimeout(timer);
     };
   }, [requireAuth, session?.user?.workspaceId, searchContext.scope]);
 
-  if (!minimumLoaderComplete || (requireAuth && !sessionResolved)) {
+  if (requireAuth && !sessionResolved) {
     return <AppLoadingScreen />;
   }
 

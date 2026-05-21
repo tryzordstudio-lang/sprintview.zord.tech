@@ -26,6 +26,12 @@ export function AuthShell({ eyebrow, title, description, children, footer }) {
               <p>{description}</p>
             </div>
 
+            <div className="auth-speed-strip" aria-label="Auth highlights">
+              <span>Fast setup</span>
+              <span>Clean reports</span>
+              <span>Team access</span>
+            </div>
+
             <div className="auth-hero-points">
               <div className="auth-point">
                 <strong>AI-first visibility</strong>

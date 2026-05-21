@@ -132,7 +132,10 @@ button {
 
 .landing-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #f8fafc 0%, #eef3f9 100%);
+  background:
+    radial-gradient(circle at top right, rgba(26, 115, 232, 0.08), transparent 28%),
+    radial-gradient(circle at 15% 0%, rgba(59, 130, 246, 0.06), transparent 18%),
+    linear-gradient(180deg, #f8fafc 0%, #eef3f9 100%);
 }
 
 .marketing-navbar-shell {
@@ -262,12 +265,14 @@ button {
   grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
   gap: 28px;
   align-items: center;
-  padding: 36px 0 44px;
+  padding: 28px 0 38px;
   scroll-margin-top: 108px;
 }
 
 .landing-hero-copy {
   max-width: 640px;
+  display: grid;
+  gap: 14px;
 }
 
 .landing-hero-copy h1 {
@@ -284,6 +289,27 @@ button {
   line-height: 1.7;
 }
 
+.landing-speed-strip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.landing-speed-strip span,
+.landing-preview-badge-row span {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(26, 115, 232, 0.08);
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .landing-actions {
   display: inline-flex;
   align-items: center;
@@ -298,13 +324,23 @@ button {
 
 .landing-preview-card {
   display: grid;
-  gap: 18px;
+  gap: 16px;
   width: min(100%, 430px);
   padding: 22px;
   border: 1px solid var(--border);
   border-radius: 26px;
   background: #ffffff;
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+}
+
+.landing-preview-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.landing-preview-badge-row span {
+  background: #eef4ff;
 }
 
 .landing-preview-head {
@@ -373,8 +409,8 @@ button {
 }
 
 .landing-feature {
-  gap: 8px;
-  padding: 20px;
+  gap: 10px;
+  padding: 18px 20px;
   border: 1px solid var(--border);
   border-radius: 20px;
   background: #ffffff;
@@ -389,7 +425,7 @@ button {
 .landing-proof-card {
   display: grid;
   gap: 10px;
-  padding: 22px;
+  padding: 20px 22px;
   border: 1px solid rgba(26, 115, 232, 0.12);
   border-radius: 24px;
   background:
@@ -420,7 +456,9 @@ button {
   display: grid;
   grid-template-columns: minmax(360px, 0.98fr) minmax(420px, 1.02fr);
   min-height: 100vh;
-  background: linear-gradient(180deg, #f6f8fb 0%, #eef3f9 100%);
+  background:
+    radial-gradient(circle at top left, rgba(26, 115, 232, 0.06), transparent 24%),
+    linear-gradient(180deg, #f6f8fb 0%, #eef3f9 100%);
 }
 
 .auth-panel {
@@ -447,7 +485,7 @@ button {
 
 .auth-brand-stage {
   display: grid;
-  gap: 28px;
+  gap: 22px;
   width: min(100%, 540px);
   padding: 0;
   border: 0;
@@ -497,7 +535,7 @@ button {
 
 .auth-hero-copy {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   max-width: 480px;
 }
 
@@ -1541,7 +1579,7 @@ button {
 
 .dashboard-hero-copy {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .dashboard-hero-topline {
@@ -1573,6 +1611,34 @@ button {
   max-width: 64ch;
   color: var(--text-soft);
   line-height: 1.7;
+}
+
+.dashboard-speed-strip,
+.auth-speed-strip,
+.integration-speed-strip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dashboard-speed-strip span,
+.auth-speed-strip span,
+.integration-speed-strip span {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(26, 115, 232, 0.08);
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.integration-speed-strip {
+  margin: 4px 0 2px;
 }
 
 .dashboard-hero-actions {

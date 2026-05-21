@@ -132,7 +132,7 @@ export default function ReportsPage() {
       <PageIntro
         eyebrow="AI Report Studio"
         title="Reports"
-        description="Modern, AI-generated sprint reporting for internal review, stakeholder distribution, and enterprise-ready export workflows."
+        description="Fast access to sprint reports, governance controls, and export workflows."
         actions={
           <>
             {latestReport?.report?._id ? (
@@ -155,17 +155,14 @@ export default function ReportsPage() {
         ))}
       </section>
 
-      <Surface
-        title="Report Control Center"
-        subtitle="AI-generated executive summaries, governance controls, and stakeholder-ready distribution in one workspace."
-      >
+      <Surface title="Report Control Center" subtitle="Executive summaries, sharing, and export actions in one place.">
         <div className="report-control-grid">
           <article className="report-control-hero-card">
             <span className="report-control-kicker">Board-ready reporting</span>
             <strong>Turn sprint telemetry into a clean executive reporting stream.</strong>
             <p>
-              Each report converts sprint metrics, blockers, and AI signals into a concise narrative that can be reviewed
-              internally, published externally, and exported as a formal reporting pack.
+              Each report converts sprint metrics, blockers, and AI signals into a concise narrative for review,
+              publishing, and export.
             </p>
             <div className="report-control-actions">
               {latestPublished?.report?.shareToken ? (
@@ -201,7 +198,7 @@ export default function ReportsPage() {
         </div>
       </Surface>
 
-      <Surface title="Report Library" subtitle="Published and draft report states with clean governance-ready actions.">
+      <Surface title="Report Library" subtitle="Published and draft reports with export and sharing actions.">
         {rows.length ? (
           <div className="report-library-list">
             {rows.map((row, index) => (

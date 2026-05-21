@@ -10,10 +10,15 @@ export default function HomePage() {
         <section id="platform" className="landing-hero">
           <div className="landing-hero-copy">
             <p className="eyebrow">AI Sprint Intelligence</p>
-            <h1>See sprint health, delivery risk, and executive-ready reporting in one place.</h1>
+            <div className="landing-speed-strip" aria-label="Platform status">
+              <span>Live sync</span>
+              <span>Fast reports</span>
+              <span>Clean sharing</span>
+            </div>
+            <h1>Move sprint reporting at the speed of the team.</h1>
             <p className="landing-description">
-              Zord SprintView turns Jira delivery signals into clear operational visibility for engineering teams and
-              stakeholders without becoming another project management tool.
+              Zord SprintView turns Jira delivery signals into clear operating signals, executive-ready reports, and
+              faster decisions without adding process weight.
             </p>
 
             <div className="landing-actions">
@@ -28,6 +33,10 @@ export default function HomePage() {
 
           <div className="landing-preview">
             <div className="landing-preview-card">
+              <div className="landing-preview-badge-row">
+                <span>Auto-synced</span>
+                <span>Presentation-ready</span>
+              </div>
               <div className="landing-preview-head">
                 <span>Current Sprint</span>
                 <strong>Health 82</strong>
@@ -57,21 +66,21 @@ export default function HomePage() {
         <section id="features" className="landing-section-stack">
           <div className="landing-section-heading">
             <p className="eyebrow">Core Workflow</p>
-            <h2>From sprint import to stakeholder-ready reporting without the manual churn.</h2>
+            <h2>Import, interpret, and publish without slowing the team down.</h2>
           </div>
 
           <div className="landing-feature-grid">
             <article className="landing-feature">
               <strong>Import from Jira</strong>
-              <p>Connect boards, select a sprint, and pull delivery data into a clean reporting workflow.</p>
+              <p>Connect boards, select a sprint, and pull delivery data into one reporting flow.</p>
             </article>
             <article className="landing-feature">
               <strong>AI-generated insights</strong>
-              <p>Highlight blockers, workload imbalance, and confidence gaps without manual analysis.</p>
+              <p>Surface blockers, workload imbalance, and confidence gaps in a few seconds.</p>
             </article>
             <article className="landing-feature">
               <strong>Stakeholder-ready reports</strong>
-              <p>Generate public links and PDF summaries that are structured for leadership review.</p>
+              <p>Generate links and PDF summaries shaped for leadership review.</p>
             </article>
           </div>
         </section>
