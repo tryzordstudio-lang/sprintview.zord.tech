@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { PageIntro } from "@/components/ui";
+import { MetricCard } from "@/components/ui";
 import { apiPost } from "@/lib/api";
 import {
   buildRiskPreview,
@@ -270,37 +270,154 @@ export default function NewSprintPage() {
   const storyDiagnostics = collectStoryDiagnostics(form.stories);
   const snapshot = buildRiskPreview(form.stories);
   const hasDateError = form.startDate && form.endDate && new Date(form.startDate) > new Date(form.endDate);
+  const heroMetrics = [
+    {
+      label: "Stories",
+      value: snapshot.storyCount,
+      unit: "",
+      detail: `${storyDiagnostics.validStories} ready for creation`,
+      tone: snapshot.storyCount ? "healthy" : "default"
+    },
+    {
+      label: "Points",
+      value: snapshot.totalPoints,
+      unit: "",
+      detail: `${snapshot.blockedCount} blocked signal${snapshot.blockedCount === 1 ? "" : "s"}`,
+      tone: snapshot.blockedCount ? "warning" : "healthy"
+    },
+    {
+      label: "Health",
+      value: snapshot.healthPrediction || "—",
+      unit: snapshot.healthPrediction ? "%" : "",
+      detail: snapshot.note,
+      tone: snapshot.risk === "High" ? "risk" : snapshot.risk === "Medium" ? "warning" : "healthy"
+    },
+    {
+      label: "Validation",
+      value: storyDiagnostics.rowsWithIssues,
+      unit: "",
+      detail: storyDiagnostics.rowsWithIssues ? "Rows need review" : "No row-level issues",
+      tone: storyDiagnostics.rowsWithIssues ? "warning" : "healthy"
+    }
+  ];
+
+  const workflowSteps = [
+    {
+      step: "01",
+      title: "Configure",
+      detail: "Set the project identity, sprint window, and goal before importing work."
+    },
+    {
+      step: "02",
+      title: "Import",
+      detail: "Add stories manually or drop in CSV/XLSX data with automatic normalization."
+    },
+    {
+      step: "03",
+      title: "Review",
+      detail: "Check the sprint snapshot, validation banners, and risk signal before saving."
+    }
+  ];
+
+  const readinessChecks = [
+    {
+      label: "Project metadata",
+      done: Boolean(form.projectName.trim() && form.projectKey.trim())
+    },
+    {
+      label: "Sprint identity",
+      done: Boolean(form.sprintName.trim())
+    },
+    {
+      label: "Story coverage",
+      done: snapshot.storyCount > 0 && storyDiagnostics.rowsWithIssues === 0
+    },
+    {
+      label: "Date window",
+      done: Boolean(!hasDateError && (form.startDate || form.endDate))
+    }
+  ];
 
   return (
     <AppShell>
-      <PageIntro
-        eyebrow="Sprint Management"
-        title="Create Sprint"
-        description="Build the sprint on a full page, import stories in bulk, and save it first. AI analysis still starts only when you trigger it manually."
-        actions={
-          <Link className="button-secondary" href="/sprints">
-            Back to Sprints
-          </Link>
-        }
-      />
-
-      <section className="manual-sprint-page-card">
-        <div className="manual-sprint-shell">
-          <div className="manual-sprint-topbar">
-            <Link className="manual-sprint-back" href="/sprints">
-              ← Back to Sprint Registry
-            </Link>
-            <span className="manual-sprint-helper">AI remains manual until you choose Generate AI.</span>
+      <section className="manual-sprint-page-card manual-sprint-page-card-modern">
+        <div className="manual-sprint-shell manual-sprint-shell-modern">
+          <div className="manual-sprint-topbar manual-sprint-topbar-modern">
+            <div className="manual-sprint-topbar-copy">
+              <Link className="manual-sprint-back" href="/sprints">
+                ← Back to Sprint Registry
+              </Link>
+              <span className="manual-sprint-helper">Drafts are auto-saved locally. AI analysis stays manual until you trigger it.</span>
+            </div>
+            <span className="manual-sprint-topbar-badge">Enterprise sprint intake</span>
           </div>
 
-          <div className="manual-sprint-hero">
-            <p className="eyebrow">New Sprint</p>
-            <h2>Create a sprint without the popup</h2>
-            <p>Fill in the sprint details, import or add stories, and review the snapshot before saving the sprint record.</p>
-          </div>
+          <section className="manual-sprint-hero-grid">
+            <div className="manual-sprint-hero-card">
+              <p className="eyebrow">New Sprint</p>
+              <h2>Create a polished sprint record with clean alignment and a professional review flow.</h2>
+              <p>
+                Set the project identity, import stories in bulk, and validate delivery risk before the sprint is published.
+              </p>
+
+              <div className="manual-sprint-hero-actions">
+                <button className="button-secondary" type="button" onClick={() => fileInputRef.current?.click()}>
+                  Import stories
+                </button>
+                <Link className="button-secondary" href="/integrations">
+                  Connect Jira
+                </Link>
+                <Link className="button-secondary" href="/sprints">
+                  Cancel
+                </Link>
+              </div>
+
+              <div className="manual-sprint-hero-metrics">
+                {heroMetrics.map((metric) => (
+                  <MetricCard key={metric.label} {...metric} />
+                ))}
+              </div>
+            </div>
+
+            <aside className="manual-sprint-hero-rail">
+              <div className="manual-sprint-rail-card">
+                <div className="manual-sprint-rail-header">
+                  <span className="manual-sprint-section-label">Workflow</span>
+                  <strong>Three-step creation flow</strong>
+                </div>
+                <div className="manual-sprint-workflow-list">
+                  {workflowSteps.map((step) => (
+                    <article key={step.step} className="manual-sprint-workflow-step">
+                      <span>{step.step}</span>
+                      <div>
+                        <strong>{step.title}</strong>
+                        <p>{step.detail}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+
+              <div className="manual-sprint-rail-card">
+                <div className="manual-sprint-rail-header">
+                  <span className="manual-sprint-section-label">Readiness</span>
+                  <strong>Quality gate</strong>
+                </div>
+                <div className="manual-sprint-readiness-list">
+                  {readinessChecks.map((check) => (
+                    <div key={check.label} className="manual-sprint-readiness-item">
+                      <span className={check.done ? "is-done" : "is-pending"}>{check.done ? "Ready" : "Pending"}</span>
+                      <strong>{check.label}</strong>
+                    </div>
+                  ))}
+                </div>
+                <p className="manual-sprint-snapshot-note">{snapshot.note}</p>
+              </div>
+            </aside>
+          </section>
 
           <form className="manual-sprint-form" onSubmit={handleCreateSprint}>
-            <div className="manual-sprint-layout">
+            <div className="manual-sprint-layout manual-sprint-layout-modern">
               <section className="manual-sprint-panel manual-sprint-config-panel">
                 <div className="manual-sprint-panel-header">
                   <div>
