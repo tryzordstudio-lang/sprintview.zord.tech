@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { BarChart, DonutChart, SparklineChart } from "@/components/charts";
 import { DataTable, StatusPill, Surface } from "@/components/ui";
-import { apiGet, apiPost, resolveAssetUrl } from "@/lib/api";
+import { apiGet, resolveAssetUrl } from "@/lib/api";
 import { buildAssigneeLoad, buildCompletionTrendFromSprints, buildVelocityTrendFromSprints, formatDate, mapInsight } from "@/lib/view-models";
 
 function clamp(value, min, max) {
@@ -39,10 +39,6 @@ export default function SharedReportPage({ params }) {
   const [payload, setPayload] = useState(null);
   const [error, setError] = useState("");
   const [passwordRequired, setPasswordRequired] = useState(false);
-  const [comments, setComments] = useState([]);
-  const [commentName, setCommentName] = useState("");
-  const [commentMessage, setCommentMessage] = useState("");
-  const [submittingComment, setSubmittingComment] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -60,7 +56,6 @@ export default function SharedReportPage({ params }) {
         }
 
         setPayload(result);
-        setComments(result?.comments || []);
         setPasswordRequired(false);
       } catch (loadError) {
         if (!active) {
@@ -68,7 +63,6 @@ export default function SharedReportPage({ params }) {
         }
 
         setPayload(null);
-        setComments([]);
         if (loadError?.status === 401) {
           setPasswordRequired(true);
           setError("This shared report requires a valid password.");
@@ -88,34 +82,6 @@ export default function SharedReportPage({ params }) {
       active = false;
     };
   }, [params, submittedPassword]);
-
-  async function handleSubmitComment(event) {
-    event.preventDefault();
-    if (!payload?.sharing?.allowComments || !commentMessage.trim()) {
-      return;
-    }
-
-    try {
-      setSubmittingComment(true);
-      const resolvedParams = await params;
-      const result = await apiPost(
-        `/report/public/${resolvedParams.slug}/comments`,
-        {
-          authorName: commentName.trim() || "Anonymous",
-          message: commentMessage.trim(),
-          password: submittedPassword
-        },
-        { credentials: "omit" }
-      );
-      setComments((current) => [...current, result]);
-      setCommentName("");
-      setCommentMessage("");
-    } catch (submitError) {
-      setError(submitError.message || "Unable to add comment.");
-    } finally {
-      setSubmittingComment(false);
-    }
-  }
 
   const viewModel = useMemo(() => {
     if (!payload) {
@@ -222,32 +188,6 @@ export default function SharedReportPage({ params }) {
           tone: blockedStories ? "risk" : "healthy"
         }
       ],
-      workflowSteps: [
-        {
-          label: "Import",
-          detail: "Sprint and issue data ingested from Jira or manual upload.",
-          tone: "healthy",
-          state: "complete"
-        },
-        {
-          label: "Analyze",
-          detail: sprint?.status === "processing" ? "AI is generating sprint intelligence right now." : "AI analysis completed for the report.",
-          tone: sprint?.status === "processing" ? "warning" : "healthy",
-          state: sprint?.status === "processing" ? "active" : "complete"
-        },
-        {
-          label: "Format",
-          detail: "Widgets, layout, and export formatting are aligned for leadership review.",
-          tone: "healthy",
-          state: sprint?.status === "ready" ? "complete" : "active"
-        },
-        {
-          label: "Share",
-          detail: payload?.sharing?.allowComments ? "Public review and comments are enabled." : "Share link ready for internal stakeholders.",
-          tone: payload?.sharing?.mode === "public" ? "healthy" : "warning",
-          state: payload?.sharing?.mode === "private" ? "pending" : "complete"
-        }
-      ]
     };
   }, [payload]);
 
@@ -340,7 +280,6 @@ export default function SharedReportPage({ params }) {
                 <StatusPill tone={viewModel.sprint?.deliveryRisk === "high" ? "risk" : viewModel.sprint?.deliveryRisk === "medium" ? "warning" : "healthy"}>
                   {capitalize(viewModel.sprint?.deliveryRisk || "medium")} risk
                 </StatusPill>
-                {payload?.sharing?.allowComments ? <StatusPill tone="default">Comments enabled</StatusPill> : null}
               </div>
               <p className="page-description">
                 {viewModel.sprint?.aiSummary ||
@@ -373,71 +312,6 @@ export default function SharedReportPage({ params }) {
             </aside>
           </div>
         </Surface>
-
-        <Surface title="Workflow" subtitle="The end-to-end delivery path for this sample sprint report.">
-          <div className="public-report-workflow-grid">
-            {viewModel.workflowSteps.map((step, index) => (
-              <article key={step.label} className={`public-report-workflow-card state-${step.state} tone-${step.tone}`}>
-                <div className="public-report-workflow-top">
-                  <span>Step {index + 1}</span>
-                  <StatusPill tone={step.tone}>{step.state}</StatusPill>
-                </div>
-                <strong>{step.label}</strong>
-                <p>{step.detail}</p>
-              </article>
-            ))}
-          </div>
-        </Surface>
-
-        {payload?.sharing?.allowComments ? (
-          <Surface title="Comments" subtitle="Stakeholder feedback is enabled for this shared report.">
-            <div className="public-report-comment-grid">
-              <form className="public-report-comment-form" onSubmit={handleSubmitComment}>
-                <label className="builder-field">
-                  <span>Your name</span>
-                  <input
-                    value={commentName}
-                    onChange={(event) => setCommentName(event.target.value)}
-                    placeholder="Anonymous"
-                  />
-                </label>
-                <label className="builder-field">
-                  <span>Comment</span>
-                  <textarea
-                    value={commentMessage}
-                    onChange={(event) => setCommentMessage(event.target.value)}
-                    placeholder="Add stakeholder notes, feedback, or follow-up items."
-                    rows={4}
-                  />
-                </label>
-                <div className="page-actions">
-                  <button className="button" type="submit" disabled={!commentMessage.trim() || submittingComment}>
-                    {submittingComment ? "Posting..." : "Post Comment"}
-                  </button>
-                </div>
-              </form>
-
-              <div className="public-report-comment-list">
-                {comments.length ? (
-                  comments.map((comment) => (
-                    <article key={comment.id} className="public-report-comment-card">
-                      <div className="public-report-comment-meta">
-                        <strong>{comment.authorName || "Anonymous"}</strong>
-                        <span>{formatDate(comment.createdAt)}</span>
-                      </div>
-                      <p>{comment.message}</p>
-                    </article>
-                  ))
-                ) : (
-                  <article className="public-report-empty">
-                    <strong>No comments yet.</strong>
-                    <p>Be the first to add a note on this stakeholder report.</p>
-                  </article>
-                )}
-              </div>
-            </div>
-          </Surface>
-        ) : null}
 
         <div className="public-report-overview-grid">
           <Surface className="public-report-health-surface" title="Sprint Health" subtitle="Executive-level interpretation of delivery posture and ownership concentration.">
