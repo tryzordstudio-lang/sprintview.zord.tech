@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { InsightCard, MetricCard, PageIntro, StatusPill, Surface } from "@/components/ui";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet, startSprintAnalysis } from "@/lib/api";
 import { formatDate, mapInsight } from "@/lib/view-models";
 
 function statusTone(status) {
@@ -87,7 +87,7 @@ export default function InsightsPage() {
       setActiveSprintId(sprintId);
       setError("");
       setSuccess("");
-      await apiPost(`/sprints/${sprintId}/analyze`, {});
+      await startSprintAnalysis(sprintId);
       setSuccess("AI analysis started. Insight generation is now in progress.");
       await load();
     } catch (actionError) {

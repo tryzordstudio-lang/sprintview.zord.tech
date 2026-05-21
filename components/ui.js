@@ -61,10 +61,11 @@ export function InsightCard({ category, severity, title, summary, recommendation
   );
 }
 
-export function HealthRing({ score, label }) {
+export function HealthRing({ score, label, hideLabel = false }) {
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
+  const tone = score >= 80 ? "healthy" : score >= 50 ? "warning" : "risk";
 
   return (
     <div className="health-ring-card">
@@ -72,7 +73,7 @@ export function HealthRing({ score, label }) {
         <svg viewBox="0 0 140 140" className="health-ring-svg" aria-label={`Health score ${score}`}>
           <circle className="health-ring-track" cx="70" cy="70" r={radius} />
           <circle
-            className="health-ring-progress"
+            className={`health-ring-progress tone-${tone}`}
             cx="70"
             cy="70"
             r={radius}
@@ -84,7 +85,7 @@ export function HealthRing({ score, label }) {
           <span>Health</span>
         </div>
       </div>
-      <p className="health-ring-label">{label}</p>
+      {!hideLabel && <p className="health-ring-label">{label}</p>}
     </div>
   );
 }

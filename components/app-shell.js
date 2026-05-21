@@ -29,7 +29,7 @@ function getSearchContext(pathname) {
     };
   }
 
-  if (pathname.startsWith("/reports") || pathname.startsWith("/report/")) {
+  if (pathname.startsWith("/reports")) {
     return {
       scope: "reports",
       placeholder: "Search reports...",
@@ -81,7 +81,7 @@ function buildScopedSearchResults({ scope, sprintEntries = [], reportEntries = [
     id: `report-${entry.report?._id || index}`,
     label: entry.sprint?.name || "Report",
     meta: entry.project?.name || "Report",
-    href: entry.report?._id ? `/reports/${entry.report._id}` : "/reports",
+    href: entry.report?._id ? `/reports/${entry.report._id}/layout` : "/reports",
     kind: "Report"
   }));
 

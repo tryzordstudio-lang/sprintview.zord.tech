@@ -12,8 +12,23 @@ export default function SettingsPage() {
     name: "",
     email: "",
     workspaceName: "",
-    hasPassword: true
+    hasPassword: true,
+    role: "viewer"
   });
+  const [workspaceForm, setWorkspaceForm] = useState({
+    name: "",
+    slug: "",
+    description: "",
+    timezone: "UTC",
+    companyName: "",
+    companyTagline: "",
+    logoUrl: "",
+    alertChannel: "email",
+    digestWindow: "monday-0900",
+    defaultShareMode: "team",
+    allowPublicLinks: true
+  });
+  const [members, setMembers] = useState([]);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -24,10 +39,12 @@ export default function SettingsPage() {
     password: ""
   });
   const [loading, setLoading] = useState(true);
+  const [savingWorkspace, setSavingWorkspace] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const canManageWorkspace = meta.role === "owner" || meta.role === "admin";
 
   useEffect(() => {
     let active = true;
@@ -36,7 +53,11 @@ export default function SettingsPage() {
       try {
         setLoading(true);
         setError("");
-        const session = await apiGet("/users/me");
+        const [session, settings, membersResult] = await Promise.all([
+          apiGet("/users/me"),
+          apiGet("/settings").catch(() => null),
+          apiGet("/users/workspace/members").catch(() => ({ items: [] }))
+        ]);
         if (!active) {
           return;
         }
@@ -46,8 +67,24 @@ export default function SettingsPage() {
           name: session?.user?.name || "Workspace user",
           email: session?.user?.email || "",
           workspaceName: session?.workspace?.name || "Workspace",
-          hasPassword: providers.includes("password")
+          hasPassword: providers.includes("password"),
+          role: session?.user?.role || "viewer"
         });
+        setWorkspaceForm({
+          name: settings?.workspace?.name || session?.workspace?.name || "",
+          slug: settings?.workspace?.slug || session?.workspace?.slug || "",
+          description: settings?.workspace?.description || session?.workspace?.description || "",
+          timezone: settings?.workspace?.timezone || session?.workspace?.timezone || "UTC",
+          companyName: settings?.branding?.companyName || session?.workspace?.branding?.companyName || "",
+          companyTagline: settings?.branding?.companyTagline || session?.workspace?.branding?.companyTagline || "",
+          logoUrl: settings?.branding?.logoUrl || session?.workspace?.branding?.logoUrl || "",
+          alertChannel: settings?.notifications?.alertChannel || "email",
+          digestWindow: settings?.notifications?.digestWindow || "monday-0900",
+          defaultShareMode: settings?.accessControl?.defaultShareMode || session?.workspace?.accessControl?.defaultShareMode || "team",
+          allowPublicLinks:
+            settings?.accessControl?.allowPublicLinks ?? session?.workspace?.accessControl?.allowPublicLinks ?? true
+        });
+        setMembers(membersResult?.items || []);
       } catch (loadError) {
         if (active) {
           setError(loadError.message || "Unable to load account settings.");
@@ -77,6 +114,51 @@ export default function SettingsPage() {
       ...current,
       [key]: value
     }));
+  }
+
+  function updateWorkspaceField(key, value) {
+    setWorkspaceForm((current) => ({
+      ...current,
+      [key]: value
+    }));
+  }
+
+  async function handleWorkspaceSave(event) {
+    event.preventDefault();
+    setError("");
+    setSuccess("");
+
+    try {
+      setSavingWorkspace(true);
+      await apiPatch("/settings", {
+        name: workspaceForm.name,
+        slug: workspaceForm.slug,
+        description: workspaceForm.description,
+        timezone: workspaceForm.timezone,
+        branding: {
+          companyName: workspaceForm.companyName,
+          companyTagline: workspaceForm.companyTagline,
+          logoUrl: workspaceForm.logoUrl
+        },
+        notifications: {
+          alertChannel: workspaceForm.alertChannel,
+          digestWindow: workspaceForm.digestWindow
+        },
+        accessControl: {
+          defaultShareMode: workspaceForm.defaultShareMode,
+          allowPublicLinks: workspaceForm.allowPublicLinks
+        }
+      });
+      setMeta((current) => ({
+        ...current,
+        workspaceName: workspaceForm.name
+      }));
+      setSuccess("Workspace settings updated.");
+    } catch (saveError) {
+      setError(saveError.message || "Unable to update workspace settings.");
+    } finally {
+      setSavingWorkspace(false);
+    }
   }
 
   async function handlePasswordSave(event) {
@@ -150,9 +232,9 @@ export default function SettingsPage() {
   return (
     <AppShell>
       <PageIntro
-        eyebrow="Account Settings"
+        eyebrow="Enterprise Settings"
         title="Settings"
-        description="Manage password access and permanently remove this SprintView account."
+        description="Manage workspace governance, sharing defaults, account access, and lifecycle controls."
       />
 
       {error ? <div className="auth-alert">{error}</div> : null}
@@ -165,10 +247,13 @@ export default function SettingsPage() {
             <strong>{meta.name || "Workspace user"}</strong>
             <span>{meta.email || "Loading..."}</span>
             <span>{meta.workspaceName || "Workspace"}</span>
+            <span>{meta.role ? `${meta.role} role` : "viewer role"}</span>
           </div>
 
           <nav className="settings-local-nav-list" aria-label="Settings sections">
             <a href="#general" className="settings-local-link is-active">General</a>
+            <a href="#workspace" className="settings-local-link">Workspace</a>
+            <a href="#members" className="settings-local-link">Members</a>
             <a href="#password" className="settings-local-link">Password</a>
             <a href="#delete-account" className="settings-local-link">Account</a>
           </nav>
@@ -193,6 +278,151 @@ export default function SettingsPage() {
                 <label>Workspace Name</label>
                 <input value={meta.workspaceName} disabled />
               </div>
+              <div className="settings-field">
+                <label>Role</label>
+                <input value={meta.role} disabled />
+              </div>
+            </div>
+          </Surface>
+
+          <Surface
+            title="Workspace Controls"
+            subtitle="Branding, timezone, notifications, and default sharing policy."
+            className="settings-section"
+          >
+            <form id="workspace" className="settings-form-grid" onSubmit={handleWorkspaceSave}>
+              <div className="settings-field">
+                <label>Workspace Name</label>
+                <input
+                  value={workspaceForm.name}
+                  onChange={(event) => updateWorkspaceField("name", event.target.value)}
+                  disabled={loading || savingWorkspace || !canManageWorkspace}
+                />
+              </div>
+              <div className="settings-field">
+                <label>Slug</label>
+                <input
+                  value={workspaceForm.slug}
+                  onChange={(event) => updateWorkspaceField("slug", event.target.value.toLowerCase())}
+                  disabled={loading || savingWorkspace || !canManageWorkspace}
+                />
+              </div>
+              <div className="settings-field settings-field-full">
+                <label>Description</label>
+                <input
+                  value={workspaceForm.description}
+                  onChange={(event) => updateWorkspaceField("description", event.target.value)}
+                  disabled={loading || savingWorkspace || !canManageWorkspace}
+                />
+              </div>
+              <div className="settings-field">
+                <label>Timezone</label>
+                <input
+                  value={workspaceForm.timezone}
+                  onChange={(event) => updateWorkspaceField("timezone", event.target.value)}
+                  disabled={loading || savingWorkspace || !canManageWorkspace}
+                />
+              </div>
+              <div className="settings-field">
+                <label>Default Share Mode</label>
+                <select
+                  value={workspaceForm.defaultShareMode}
+                  onChange={(event) => updateWorkspaceField("defaultShareMode", event.target.value)}
+                  disabled={loading || savingWorkspace || !canManageWorkspace}
+                >
+                  <option value="private">Private</option>
+                  <option value="team">Team</option>
+                  <option value="public">Public</option>
+                  <option value="password">Password</option>
+                </select>
+              </div>
+              <div className="settings-field">
+                <label>Brand Company</label>
+                <input
+                  value={workspaceForm.companyName}
+                  onChange={(event) => updateWorkspaceField("companyName", event.target.value)}
+                  disabled={loading || savingWorkspace || !canManageWorkspace}
+                />
+              </div>
+              <div className="settings-field">
+                <label>Brand Tagline</label>
+                <input
+                  value={workspaceForm.companyTagline}
+                  onChange={(event) => updateWorkspaceField("companyTagline", event.target.value)}
+                  disabled={loading || savingWorkspace || !canManageWorkspace}
+                />
+              </div>
+              <div className="settings-field settings-field-full">
+                <label>Logo URL</label>
+                <input
+                  value={workspaceForm.logoUrl}
+                  onChange={(event) => updateWorkspaceField("logoUrl", event.target.value)}
+                  disabled={loading || savingWorkspace || !canManageWorkspace}
+                />
+              </div>
+              <div className="settings-field">
+                <label>Alert Channel</label>
+                <select
+                  value={workspaceForm.alertChannel}
+                  onChange={(event) => updateWorkspaceField("alertChannel", event.target.value)}
+                  disabled={loading || savingWorkspace || !canManageWorkspace}
+                >
+                  <option value="email">Email</option>
+                  <option value="slack-email">Slack Email</option>
+                  <option value="slack">Slack</option>
+                </select>
+              </div>
+              <div className="settings-field">
+                <label>Digest Window</label>
+                <select
+                  value={workspaceForm.digestWindow}
+                  onChange={(event) => updateWorkspaceField("digestWindow", event.target.value)}
+                  disabled={loading || savingWorkspace || !canManageWorkspace}
+                >
+                  <option value="monday-0900">Monday 09:00</option>
+                  <option value="friday-1600">Friday 16:00</option>
+                </select>
+              </div>
+              <div className="settings-field settings-field-full">
+                <label>Public Links</label>
+                <select
+                  value={workspaceForm.allowPublicLinks ? "enabled" : "disabled"}
+                  onChange={(event) => updateWorkspaceField("allowPublicLinks", event.target.value === "enabled")}
+                  disabled={loading || savingWorkspace || !canManageWorkspace}
+                >
+                  <option value="enabled">Enabled</option>
+                  <option value="disabled">Disabled</option>
+                </select>
+              </div>
+              {canManageWorkspace ? (
+                <div className="settings-actions-bar settings-field-full">
+                  <button className="button" type="submit" disabled={loading || savingWorkspace}>
+                    {savingWorkspace ? "Saving..." : "Save Workspace Settings"}
+                  </button>
+                </div>
+              ) : null}
+            </form>
+          </Surface>
+
+          <Surface
+            title="Workspace Members"
+            subtitle="Current members and access roles for this workspace."
+            className="settings-section"
+          >
+            <div id="members" className="settings-form-grid">
+              {(members || []).length ? (
+                members.map((member) => (
+                  <div key={member.id} className="settings-field settings-field-full">
+                    <label>{member.name}</label>
+                    <input value={`${member.email} • ${member.role} • ${member.status}`} disabled />
+                  </div>
+                ))
+              ) : (
+                <div className="settings-field settings-field-full">
+                  <label>Members</label>
+                  <input value="No workspace members found." disabled />
+                </div>
+              )}
             </div>
           </Surface>
 

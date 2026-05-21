@@ -9,6 +9,7 @@ export const metadata = {
 export default async function SignInPage({ searchParams }) {
   const resolvedSearchParams = await searchParams;
   const errorMessage = resolvedSearchParams?.error;
+  const notice = resolvedSearchParams?.notice;
 
   return (
     <AuthShell
@@ -29,6 +30,11 @@ export default async function SignInPage({ searchParams }) {
       {errorMessage ? (
         <div className="auth-alert" role="alert">
           {errorMessage}
+        </div>
+      ) : null}
+      {notice === "reset-success" ? (
+        <div className="manual-sprint-success" role="status">
+          Password reset successful. Sign in with your new password.
         </div>
       ) : null}
       <EmailSignInForm />

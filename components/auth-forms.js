@@ -305,3 +305,143 @@ export function EmailSignUpForm() {
     </form>
   );
 }
+
+export function ForgotPasswordForm() {
+  const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [previewResetUrl, setPreviewResetUrl] = useState("");
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError("");
+    setSuccess("");
+    setPreviewResetUrl("");
+
+    try {
+      const result = await apiPost(
+        "/auth/forgot-password",
+        { email },
+        { credentials: "omit" }
+      );
+      setSuccess(
+        "If an account exists for that email, a password reset link has been prepared."
+      );
+      setPreviewResetUrl(result?.previewResetUrl || "");
+    } catch (submitError) {
+      setError(submitError.message || "Unable to request a password reset.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="auth-form" onSubmit={handleSubmit}>
+      {error ? (
+        <div className="auth-alert" role="alert">
+          {error}
+        </div>
+      ) : null}
+
+      {success ? (
+        <div className="manual-sprint-success" role="status">
+          <strong>Reset request received.</strong>
+          <p>{success}</p>
+          {previewResetUrl ? (
+            <p>
+              Development preview: <a href={previewResetUrl}>open reset link</a>
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      <AuthField
+        label="Work email"
+        name="email"
+        type="email"
+        placeholder="you@company.com"
+        value={email}
+        onChange={(event) => setEmail(event.target.value)}
+        autoComplete="email"
+      />
+      <button className="button auth-submit" type="submit" disabled={submitting}>
+        {submitting ? "Sending..." : "Send reset link"}
+      </button>
+    </form>
+  );
+}
+
+export function ResetPasswordForm({ initialToken = "" }) {
+  const router = useRouter();
+  const [token, setToken] = useState(initialToken);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError("");
+
+    try {
+      await apiPost(
+        "/auth/reset-password",
+        {
+          token,
+          newPassword,
+          confirmPassword
+        },
+        { credentials: "omit" }
+      );
+      router.replace("/signin?notice=reset-success");
+      router.refresh();
+    } catch (submitError) {
+      setError(submitError.message || "Unable to reset password.");
+      setSubmitting(false);
+      return;
+    }
+  }
+
+  return (
+    <form className="auth-form" onSubmit={handleSubmit}>
+      {error ? (
+        <div className="auth-alert" role="alert">
+          {error}
+        </div>
+      ) : null}
+
+      <AuthField
+        label="Reset token"
+        name="token"
+        placeholder="Paste your reset token"
+        value={token}
+        onChange={(event) => setToken(event.target.value)}
+        autoComplete="off"
+      />
+      <AuthField
+        label="New password"
+        name="newPassword"
+        type="password"
+        placeholder="Enter a new password"
+        value={newPassword}
+        onChange={(event) => setNewPassword(event.target.value)}
+        autoComplete="new-password"
+      />
+      <AuthField
+        label="Confirm password"
+        name="confirmPassword"
+        type="password"
+        placeholder="Re-enter your new password"
+        value={confirmPassword}
+        onChange={(event) => setConfirmPassword(event.target.value)}
+        autoComplete="new-password"
+      />
+      <button className="button auth-submit" type="submit" disabled={submitting}>
+        {submitting ? "Updating..." : "Update password"}
+      </button>
+    </form>
+  );
+}

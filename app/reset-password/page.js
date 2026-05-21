@@ -1,11 +1,15 @@
 import Link from "next/link";
-import { AuthField, AuthShell } from "@/components/auth-shell";
+import { AuthShell } from "@/components/auth-shell";
+import { ResetPasswordForm } from "@/components/auth-forms";
 
 export const metadata = {
   title: "Reset Password | Zord SprintView"
 };
 
-export default function ResetPasswordPage() {
+export default async function ResetPasswordPage({ searchParams }) {
+  const resolvedSearchParams = await searchParams;
+  const token = resolvedSearchParams?.token || "";
+
   return (
     <AuthShell
       eyebrow="Secure Access"
@@ -22,13 +26,7 @@ export default function ResetPasswordPage() {
         <p>Use at least 12 characters with a mix of letters, numbers, and symbols.</p>
       </div>
 
-      <form className="auth-form">
-        <AuthField label="New password" type="password" placeholder="Enter a new password" />
-        <AuthField label="Confirm password" type="password" placeholder="Re-enter your new password" />
-        <button className="button auth-submit" type="submit">
-          Update password
-        </button>
-      </form>
+      <ResetPasswordForm initialToken={token} />
     </AuthShell>
   );
 }

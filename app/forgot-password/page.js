@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { AuthField, AuthShell } from "@/components/auth-shell";
+import { AuthShell } from "@/components/auth-shell";
+import { ForgotPasswordForm } from "@/components/auth-forms";
 
 export const metadata = {
   title: "Forgot Password | Zord SprintView"
@@ -22,12 +23,7 @@ export default function ForgotPasswordPage() {
         <p>Enter your work email and we&apos;ll send a password reset link.</p>
       </div>
 
-      <form className="auth-form">
-        <AuthField label="Work email" type="email" placeholder="you@company.com" />
-        <button className="button auth-submit" type="submit">
-          Send reset link
-        </button>
-      </form>
+      <ForgotPasswordForm />
     </AuthShell>
   );
 }

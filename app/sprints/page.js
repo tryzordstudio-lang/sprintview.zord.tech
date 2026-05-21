@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Icon } from "@/components/icons";
 import { ConfirmDialog, DataTable, PageIntro, StatusPill, Surface } from "@/components/ui";
-import { apiDelete, apiGet, apiPost } from "@/lib/api";
+import { apiDelete, apiGet, startSprintAnalysis } from "@/lib/api";
 import { notifyShell, refreshShellNotifications } from "@/lib/notifications";
 import { formatDate } from "@/lib/view-models";
 
@@ -70,7 +70,7 @@ export default function SprintsPage() {
   async function handleAnalyze(id) {
     try {
       setAnalyzingSprintId(id);
-      await apiPost(`/sprints/${id}/analyze`, {});
+      await startSprintAnalysis(id);
       notifyShell({
         type: "success",
         title: "AI analysis started",

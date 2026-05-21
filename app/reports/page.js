@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { ConfirmDialog, MetricCard, PageIntro, StatusPill, Surface } from "@/components/ui";
-import { apiGet, apiPatch, apiPost } from "@/lib/api";
+import { MetricCard, PageIntro, StatusPill, Surface } from "@/components/ui";
+import { apiGet, openGeneratedAsset, startSprintAnalysis } from "@/lib/api";
 import { formatDate } from "@/lib/view-models";
 
 function truncate(value, maxLength = 120) {
@@ -16,14 +16,26 @@ function truncate(value, maxLength = 120) {
   return `${normalized.slice(0, Math.max(0, maxLength - 1))}…`;
 }
 
+function getReportStateLabel(status) {
+  if (status === "ready") return "internal report";
+  if (status === "failed") return "generation failed";
+  if (status === "processing") return "generating";
+  return "awaiting ai";
+}
+
+function getReportStateTone(status) {
+  if (status === "ready") return "ready";
+  if (status === "failed") return "failed";
+  if (status === "processing") return "processing";
+  return "draft";
+}
+
 export default function ReportsPage() {
   const [rows, setRows] = useState([]);
   const [sprints, setSprints] = useState([]);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(true);
-  const [statusBusy, setStatusBusy] = useState(false);
-  const [statusTarget, setStatusTarget] = useState(null);
   const [actionSprintId, setActionSprintId] = useState("");
 
   async function load() {
@@ -48,32 +60,11 @@ export default function ReportsPage() {
   }, []);
 
   async function handlePdf(reportId) {
-    const result = await apiGet(`/report/${reportId}/pdf`);
-    if (result?.pdfUrl) {
-      window.open(result.pdfUrl, "_blank", "noopener,noreferrer");
-    }
+    await openGeneratedAsset(apiGet(`/report/${reportId}/pdf`), "pdfUrl");
   }
 
   async function handleWord(reportId) {
-    const result = await apiGet(`/report/${reportId}/word`);
-    if (result?.wordUrl) {
-      window.open(result.wordUrl, "_blank", "noopener,noreferrer");
-    }
-  }
-
-  async function handleStatusConfirm() {
-    if (!statusTarget?.reportId || !statusTarget?.nextStatus) {
-      return;
-    }
-
-    try {
-      setStatusBusy(true);
-      await apiPatch(`/report/${statusTarget.reportId}/status`, { status: statusTarget.nextStatus });
-      setStatusTarget(null);
-      await load();
-    } finally {
-      setStatusBusy(false);
-    }
+    await openGeneratedAsset(apiGet(`/report/${reportId}/word`), "wordUrl");
   }
 
   async function handleAnalyze(sprintId) {
@@ -85,7 +76,7 @@ export default function ReportsPage() {
       setActionSprintId(sprintId);
       setError("");
       setSuccess("");
-      await apiPost(`/sprints/${sprintId}/analyze`, {});
+      await startSprintAnalysis(sprintId);
       setSuccess("AI analysis started. Report generation is now in progress.");
       await load();
     } catch (actionError) {
@@ -95,14 +86,13 @@ export default function ReportsPage() {
     }
   }
 
-  const publishedCount = rows.filter((row) => row.report?.status === "published").length;
-  const draftCount = rows.filter((row) => row.report?.status !== "published").length;
   const processingCount = sprints.filter((row) => row.sprint?.status === "processing").length;
   const averageHealth = rows.length
     ? Math.round(rows.reduce((sum, row) => sum + Number(row.sprint?.healthScore || 0), 0) / rows.length)
     : 0;
   const latestReadyReport = rows.find((row) => row.sprint?.status === "ready") || null;
-  const latestPublished = rows.find((row) => row.report?.status === "published" && row.sprint?.status === "ready") || null;
+  const readyCount = rows.filter((row) => row.sprint?.status === "ready").length;
+  const exportReadyCount = rows.filter((row) => row.report?._id && row.sprint?.status === "ready").length;
   const reportBySprintId = new Map(rows.map((row) => [row?.sprint?._id, row]));
   const queueRows = sprints.map((entry) => ({
     sprint: entry.sprint,
@@ -111,16 +101,16 @@ export default function ReportsPage() {
   }));
   const libraryMetrics = [
     {
-      label: "Published Reports",
-      value: String(publishedCount),
-      detail: publishedCount ? "Stakeholder links currently active" : "No public reports available yet",
-      tone: publishedCount ? "healthy" : "default"
+      label: "Ready Reports",
+      value: String(readyCount),
+      detail: readyCount ? "Internal reports available for review" : "No report workspaces are ready yet",
+      tone: readyCount ? "healthy" : "default"
     },
     {
-      label: "Draft Reports",
-      value: String(draftCount),
-      detail: draftCount ? "Internal reviews waiting on publish approval" : "No reports waiting in draft",
-      tone: draftCount ? "warning" : "healthy"
+      label: "Export Ready",
+      value: String(exportReadyCount),
+      detail: exportReadyCount ? "PDF and Word exports can be generated now" : "Exports unlock after AI processing completes",
+      tone: exportReadyCount ? "healthy" : "warning"
     },
     {
       label: "Average Health",
@@ -144,16 +134,16 @@ export default function ReportsPage() {
     },
     {
       label: "Governance",
-      title: latestPublished ? "Stakeholder distribution active" : "Internal-only review mode",
-      detail: latestPublished
-        ? `${latestPublished.sprint?.name || "Latest report"} is currently shareable with stakeholders.`
-        : "Publish a report to expose a stakeholder link and external review surface."
+      title: latestReadyReport ? "Internal review workspace active" : "No report ready for review",
+      detail: latestReadyReport
+        ? `${latestReadyReport.sprint?.name || "Latest report"} is available for internal review and export.`
+        : "Generate a sprint report to unlock the internal review workspace and export actions."
     },
     {
       label: "Export Pack",
       title: rows.length ? "PDF and Word export workflow ready" : "No export pack generated yet",
       detail: rows.length
-        ? "Use each report card to open, publish, and export formal reporting packs."
+        ? "Use each report card to review and export formal reporting packs."
         : "Generated report exports appear after the first sprint report is created."
     }
   ];
@@ -167,7 +157,7 @@ export default function ReportsPage() {
         actions={
           <>
             {latestReadyReport?.report?._id ? (
-              <Link href={`/reports/${latestReadyReport.report._id}`} className="button">
+              <Link href={`/reports/${latestReadyReport.report._id}/layout`} className="button">
                 Open Latest Report
               </Link>
             ) : null}
@@ -199,7 +189,7 @@ export default function ReportsPage() {
 
       <Surface
         title="Report Control Center"
-        subtitle="AI-generated executive summaries, governance controls, and stakeholder-ready distribution in one workspace."
+        subtitle="AI-generated executive summaries, internal review controls, and export-ready reporting in one workspace."
       >
         <div className="report-control-grid">
           <article className="report-control-hero-card">
@@ -207,16 +197,11 @@ export default function ReportsPage() {
             <strong>Turn sprint telemetry into a clean executive reporting stream.</strong>
             <p>
               Each report converts sprint metrics, blockers, and AI signals into a concise narrative that can be reviewed
-              internally, published externally, and exported as a formal reporting pack.
+              internally and exported as a formal reporting pack.
             </p>
             <div className="report-control-actions">
-              {latestPublished?.report?.shareToken ? (
-                <Link href={`/report/${latestPublished.report.shareToken}`} className="button-secondary">
-                  Open Public Report
-                </Link>
-              ) : null}
               {latestReadyReport?.report?._id ? (
-                <Link href={`/reports/${latestReadyReport.report._id}`} className="button-secondary">
+                <Link href={`/reports/${latestReadyReport.report._id}/layout`} className="button-secondary">
                   Review AI Brief
                 </Link>
               ) : null}
@@ -323,7 +308,7 @@ export default function ReportsPage() {
                             : "Generate Insights & Report"}
                   </button>
                   {row.report?._id && row.sprint?.status === "ready" ? (
-                    <Link href={`/reports/${row.report._id}`} className="table-action">
+                    <Link href={`/reports/${row.report._id}/layout`} className="table-action">
                       Open Report
                     </Link>
                   ) : null}
@@ -339,14 +324,16 @@ export default function ReportsPage() {
         )}
       </Surface>
 
-      <Surface title="Report Library" subtitle="Published and draft report states with clean governance-ready actions.">
+      <Surface title="Report Library" subtitle="Internal sprint reports with review and export actions.">
         {rows.length ? (
           <div className="report-library-list">
             {rows.map((row, index) => (
               <article key={row.report?._id || `${row.sprint?.name}-${index}`} className="report-library-row">
                 <div className="report-library-row-copy">
                   <div className="table-badge-row">
-                    <StatusPill tone={row.report?.status || "draft"}>{row.report?.status || "draft"}</StatusPill>
+                    <StatusPill tone={getReportStateTone(row.sprint?.status)}>
+                      {getReportStateLabel(row.sprint?.status)}
+                    </StatusPill>
                     <StatusPill tone={row.sprint?.deliveryRisk || "default"}>
                       {row.sprint?.deliveryRisk ? `${row.sprint.deliveryRisk} risk` : "signal pending"}
                     </StatusPill>
@@ -378,32 +365,14 @@ export default function ReportsPage() {
                 </div>
 
                 <div className="report-library-row-actions">
-                  <Link href={`/reports/${row.report?._id}`} className="table-action">
+                  <Link href={`/reports/${row.report?._id}/layout`} className="table-action">
                     Open
                   </Link>
-                  {row.report?.status === "published" ? (
-                    <Link href={`/report/${row.report.shareToken}`} className="table-action">
-                      Public View
-                    </Link>
-                  ) : null}
                   <button className="table-action" onClick={() => handlePdf(row.report?._id)} disabled={row.sprint?.status !== "ready"}>
                     Export PDF
                   </button>
                   <button className="table-action" onClick={() => handleWord(row.report?._id)} disabled={row.sprint?.status !== "ready"}>
                     Export Word
-                  </button>
-                  <button
-                    className="table-action"
-                    disabled={row.sprint?.status !== "ready"}
-                    onClick={() =>
-                      setStatusTarget({
-                        reportId: row.report?._id,
-                        sprintName: row.sprint?.name || "this report",
-                        nextStatus: row.report?.status === "published" ? "draft" : "published"
-                      })
-                    }
-                  >
-                    {row.report?.status === "published" ? "Unpublish" : "Publish"}
                   </button>
                 </div>
               </article>
@@ -417,21 +386,6 @@ export default function ReportsPage() {
         )}
       </Surface>
 
-      <ConfirmDialog
-        open={Boolean(statusTarget)}
-        title={statusTarget?.nextStatus === "published" ? "Publish Report" : "Move Report To Draft"}
-        description={
-          statusTarget
-            ? statusTarget.nextStatus === "published"
-              ? `Publish the report for ${statusTarget.sprintName}? Stakeholders with the share link will be able to access it.`
-              : `Move the report for ${statusTarget.sprintName} back to draft? The public link will no longer be available.`
-            : ""
-        }
-        confirmLabel={statusTarget?.nextStatus === "published" ? "Publish Report" : "Move To Draft"}
-        busy={statusBusy}
-        onCancel={() => !statusBusy && setStatusTarget(null)}
-        onConfirm={handleStatusConfirm}
-      />
     </AppShell>
   );
 }
