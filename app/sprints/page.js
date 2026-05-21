@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Icon } from "@/components/icons";
-import { ConfirmDialog, DataTable, PageIntro, StatusPill, Surface } from "@/components/ui";
+import { ConfirmDialog, DataTable, MetricCard, PageIntro, StatusPill, Surface } from "@/components/ui";
 import { apiDelete, apiGet, startSprintAnalysis } from "@/lib/api";
 import { notifyShell, refreshShellNotifications } from "@/lib/notifications";
 import { formatDate } from "@/lib/view-models";
@@ -211,46 +211,59 @@ export default function SprintsPage() {
       )
     }
   ];
+  const totalSprints = rows.length;
+  const readySprints = rows.filter((row) => row.sprint?.status === "ready").length;
+  const processingSprints = rows.filter((row) => row.sprint?.status === "processing").length;
+  const averageHealth = totalSprints ? Math.round(rows.reduce((sum, row) => sum + Number(row.sprint?.healthScore || 0), 0) / totalSprints) : 0;
 
   return (
     <AppShell>
-      <PageIntro
-        eyebrow="Sprint Management"
-        title="Sprints"
-        description="Create sprints on a dedicated page, review the scope, and only start AI analysis when you want insights and report generation."
-        actions={
-          <>
-            <button className="button-secondary" onClick={load}>
-              Refresh
-            </button>
-            <Link className="button" href="/sprints/new">
-              Create New Sprint
-            </Link>
-          </>
-        }
-      />
+      <div className="management-page-shell">
+        <PageIntro
+          eyebrow="Sprint Management"
+          title="Sprints"
+          description="Create sprints on a dedicated page, review the scope, and only start AI analysis when you want insights and report generation."
+          actions={
+            <>
+              <button className="button-secondary" onClick={load}>
+                Refresh
+              </button>
+              <Link className="button" href="/sprints/new">
+                Create New Sprint
+              </Link>
+            </>
+          }
+        />
 
-      <Surface
-        title="Sprint Registry"
-        subtitle="Click any sprint name to open the full details, stories, AI signals, and report status."
-      >
-        {loading ? (
-          <div className="simple-dashboard-empty">
-            <strong>Loading sprints</strong>
-            <p>Fetching the latest sprint records for this workspace.</p>
-          </div>
-        ) : rows.length ? (
-          <DataTable columns={columns} rows={rows} />
-        ) : (
-          <div className="simple-dashboard-empty">
-            <strong>No sprints yet</strong>
-            <p>Create your first sprint on the full page flow to start tracking delivery scope, AI analysis, and reporting readiness.</p>
-            <Link className="button" href="/sprints/new">
-              Create Your First Sprint
-            </Link>
-          </div>
-        )}
-      </Surface>
+        <section className="surface-grid metrics">
+          <MetricCard label="Total Sprints" value={String(totalSprints)} detail="Visible in this workspace" tone="default" />
+          <MetricCard label="Ready" value={String(readySprints)} detail="Reports available for review" tone="healthy" />
+          <MetricCard label="Processing" value={String(processingSprints)} detail="AI generation in progress" tone={processingSprints ? "warning" : "healthy"} />
+          <MetricCard label="Average Health" value={String(averageHealth)} unit="/100" detail="Workspace delivery posture" tone={averageHealth >= 75 ? "healthy" : averageHealth >= 55 ? "warning" : "risk"} />
+        </section>
+
+        <Surface
+          title="Sprint Registry"
+          subtitle="Click any sprint name to open the full details, stories, AI signals, and report status."
+        >
+          {loading ? (
+            <div className="simple-dashboard-empty">
+              <strong>Loading sprints</strong>
+              <p>Fetching the latest sprint records for this workspace.</p>
+            </div>
+          ) : rows.length ? (
+            <DataTable columns={columns} rows={rows} />
+          ) : (
+            <div className="simple-dashboard-empty">
+              <strong>No sprints yet</strong>
+              <p>Create your first sprint on the full page flow to start tracking delivery scope, AI analysis, and reporting readiness.</p>
+              <Link className="button" href="/sprints/new">
+                Create Your First Sprint
+              </Link>
+            </div>
+          )}
+        </Surface>
+      </div>
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}
