@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
-import { PageIntro, Surface } from "@/components/ui";
+import { MetricCard, Surface, StatusPill } from "@/components/ui";
 import { apiGet, apiPost } from "@/lib/api";
 
 function JiraBrandLogo() {
@@ -47,6 +47,45 @@ export default function IntegrationsPage() {
     () => boards.find((board) => String(board.id) === String(selectedBoardId)) || null,
     [boards, selectedBoardId]
   );
+
+  const heroStats = [
+    {
+      label: "Connection",
+      value: status.connected ? "Active" : "Offline",
+      detail: status.connected ? `Linked to ${status.siteName || "Atlassian"}` : "Connect Jira to unlock import actions.",
+      tone: status.connected ? "healthy" : "warning"
+    },
+    {
+      label: "Boards",
+      value: boards.length || "0",
+      detail: boards.length ? "Available for sprint sync." : "Load boards after connecting.",
+      tone: boards.length ? "healthy" : "default"
+    },
+    {
+      label: "Sprints",
+      value: sprints.length || "0",
+      detail: selectedBoard ? `Loaded from ${selectedBoard.name}` : "Select a board to populate sprints.",
+      tone: sprints.length ? "healthy" : "default"
+    }
+  ];
+
+  const journeySteps = [
+    {
+      step: "01",
+      title: "Authenticate",
+      detail: "Connect the Atlassian site and keep the session tied to the workspace."
+    },
+    {
+      step: "02",
+      title: "Select board",
+      detail: "Load boards, choose the active source, and review the sprint list."
+    },
+    {
+      step: "03",
+      title: "Import sprint",
+      detail: "Map the sprint into SprintView with project metadata and workspace context."
+    }
+  ];
 
   function normalizeBoards(values = []) {
     return values.map((board) => ({
@@ -173,23 +212,49 @@ export default function IntegrationsPage() {
 
   return (
     <AppShell>
-      <PageIntro
-        eyebrow="Connected Systems"
-        title="Integrations"
-        description="Structured, step-driven Jira onboarding with minimal friction and clear operational status."
-      />
+      <section className="integration-page-shell">
+        <section className="integration-hero">
+          <div className="integration-hero-copy">
+            <p className="eyebrow">Connected Systems</p>
+            <h2>Integrations</h2>
+            <p className="page-description">
+              A focused Atlassian-style control surface for connecting Jira, selecting boards, and importing sprints into SprintView with clean spacing.
+            </p>
 
-      {error ? <div className="auth-alert">{error}</div> : null}
-      {actionMessage ? <div className="manual-sprint-success">{actionMessage}</div> : null}
+            <div className="integration-hero-actions">
+              <button
+                className={`integration-action ${status.connected ? "is-connected" : ""}`}
+                type="button"
+                disabled={status.connected || loading}
+                onClick={handleConnect}
+              >
+                {loading ? "Checking..." : status.connected ? "Connected" : "Connect Jira"}
+              </button>
+              <button className="button-secondary" type="button" onClick={handleLoadBoards} disabled={!status.connected || loadingBoards}>
+                {loadingBoards ? "Loading..." : "Refresh boards"}
+              </button>
+              <StatusPill tone={status.connected ? "healthy" : "warning"}>{status.connected ? "Workspace linked" : "Not connected"}</StatusPill>
+            </div>
 
-      <div className="integration-grid">
-        <Surface className="integration-card" title="Jira connection" subtitle="Connect Atlassian once, then import boards and sprints from the same workspace.">
-          <section className="integration-brand-bar">
-            <div className="integration-brand-chip">
+            <div className="integration-hero-steps">
+              {journeySteps.map((step) => (
+                <article key={step.step} className="integration-step-card">
+                  <span>{step.step}</span>
+                  <div>
+                    <strong>{step.title}</strong>
+                    <p>{step.detail}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="integration-hero-panel">
+            <div className="integration-brand-chip integration-brand-chip-large">
               <div className="integration-brand-copy">
                 <JiraBrandLogo />
                 <div>
-                  <strong>Jira</strong>
+                  <strong>Jira Cloud</strong>
                   <span>{status.connected ? `Connected to ${status.siteName || "Atlassian"}` : "Primary sprint import source"}</span>
                 </div>
               </div>
@@ -202,85 +267,117 @@ export default function IntegrationsPage() {
                 {loading ? "Checking..." : status.connected ? "Connected" : "Connect"}
               </button>
             </div>
-          </section>
-        </Surface>
 
-        <Surface className="integration-card" title="Board sync" subtitle="Load available boards and choose the sprint source you want to import.">
-          <div className="builder-panel-stack">
-            <div className="builder-inline-actions">
-              <button className="button-secondary" type="button" onClick={handleLoadBoards} disabled={!status.connected || loadingBoards}>
-                {loadingBoards ? "Loading..." : "Load Boards"}
-              </button>
+            <div className="integration-status-grid">
+              {heroStats.map((stat) => (
+                <MetricCard key={stat.label} {...stat} />
+              ))}
             </div>
 
-            <label className="builder-field">
-              <span>Jira board</span>
-              <select
-                value={selectedBoardId}
-                onChange={(event) => setSelectedBoardId(event.target.value)}
-                disabled={!status.connected || loadingBoards || !boards.length}
-              >
-                <option value="">{boards.length ? "Select a board" : "Load boards first"}</option>
-                {boards.map((board) => (
-                  <option key={board.id} value={board.id}>
-                    {board.name} {board.projectName ? `• ${board.projectName}` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="builder-field">
-              <span>Jira sprint</span>
-              <select
-                value={selectedSprintId}
-                onChange={(event) => setSelectedSprintId(event.target.value)}
-                disabled={!status.connected || loadingSprints || !selectedBoardId}
-              >
-                <option value="">{selectedBoardId ? "Select a sprint" : "Choose a board first"}</option>
-                {sprints.map((sprint) => (
-                  <option key={sprint.id} value={sprint.id}>
-                    {sprint.name}
-                    {sprint.sequence ? ` • #${sprint.sequence}` : ""}
-                    {sprint.state ? ` • ${sprint.state}` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </Surface>
-
-        <Surface className="integration-card" title="Import settings" subtitle="Set the local project identity before creating the sprint workspace.">
-          <div className="builder-panel-stack">
-            <label className="builder-field">
-              <span>Project name</span>
-              <input
-                value={projectName}
-                onChange={(event) => setProjectName(event.target.value)}
-                placeholder="Neptune Commerce Platform"
-              />
-            </label>
-            <label className="builder-field">
-              <span>Project key</span>
-              <input
-                value={projectKey}
-                onChange={(event) => setProjectKey(event.target.value.toUpperCase())}
-                placeholder="NEP"
-              />
-            </label>
-
-            <div className="builder-inline-actions">
-              <button
-                className="button"
-                type="button"
-                onClick={handleImportSprint}
-                disabled={!status.connected || importing || !selectedBoardId || !selectedSprintId}
-              >
-                {importing ? "Importing..." : "Import Jira Sprint"}
-              </button>
+            <div className="integration-status-note">
+              <strong>Operational notes</strong>
+              <p>
+                Load boards only after connection succeeds. Choose a board, review the sprint list, then import with local project metadata.
+              </p>
             </div>
           </div>
-        </Surface>
-      </div>
+        </section>
+
+        {error ? <div className="auth-alert">{error}</div> : null}
+        {actionMessage ? <div className="manual-sprint-success">{actionMessage}</div> : null}
+
+        <div className="integration-grid">
+          <Surface className="integration-card" title="Board sync" subtitle="Load available boards and choose the sprint source you want to import.">
+            <div className="builder-panel-stack integration-stack">
+              <div className="builder-inline-actions integration-inline-actions">
+                <button className="button-secondary" type="button" onClick={handleLoadBoards} disabled={!status.connected || loadingBoards}>
+                  {loadingBoards ? "Loading..." : "Load Boards"}
+                </button>
+                <StatusPill tone={boards.length ? "healthy" : "default"}>{boards.length ? `${boards.length} boards ready` : "No boards loaded"}</StatusPill>
+              </div>
+
+              <label className="builder-field">
+                <span>Jira board</span>
+                <select
+                  value={selectedBoardId}
+                  onChange={(event) => setSelectedBoardId(event.target.value)}
+                  disabled={!status.connected || loadingBoards || !boards.length}
+                >
+                  <option value="">{boards.length ? "Select a board" : "Load boards first"}</option>
+                  {boards.map((board) => (
+                    <option key={board.id} value={board.id}>
+                      {board.name} {board.projectName ? `• ${board.projectName}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="builder-field">
+                <span>Jira sprint</span>
+                <select
+                  value={selectedSprintId}
+                  onChange={(event) => setSelectedSprintId(event.target.value)}
+                  disabled={!status.connected || loadingSprints || !selectedBoardId}
+                >
+                  <option value="">{selectedBoardId ? "Select a sprint" : "Choose a board first"}</option>
+                  {sprints.map((sprint) => (
+                    <option key={sprint.id} value={sprint.id}>
+                      {sprint.name}
+                      {sprint.sequence ? ` • #${sprint.sequence}` : ""}
+                      {sprint.state ? ` • ${sprint.state}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </Surface>
+
+          <Surface className="integration-card" title="Import settings" subtitle="Set the local project identity before creating the sprint workspace.">
+            <div className="builder-panel-stack integration-stack">
+              <label className="builder-field">
+                <span>Project name</span>
+                <input value={projectName} onChange={(event) => setProjectName(event.target.value)} placeholder="Neptune Commerce Platform" />
+              </label>
+              <label className="builder-field">
+                <span>Project key</span>
+                <input value={projectKey} onChange={(event) => setProjectKey(event.target.value.toUpperCase())} placeholder="NEP" />
+              </label>
+
+              <div className="integration-summary-strip">
+                <div>
+                  <span>Selected board</span>
+                  <strong>{selectedBoard?.name || "None"}</strong>
+                </div>
+                <div>
+                  <span>Selected sprint</span>
+                  <strong>{sprints.find((sprint) => String(sprint.id) === String(selectedSprintId))?.name || "None"}</strong>
+                </div>
+              </div>
+            </div>
+          </Surface>
+
+          <Surface className="integration-card" title="Import execution" subtitle="Final validation before the sprint is created in SprintView.">
+            <div className="integration-import-card">
+              <p className="integration-import-copy">
+                Keep the connection clean, confirm the sprint context, then import directly into the workspace with project metadata attached.
+              </p>
+              <div className="integration-import-actions">
+                <button
+                  className="button"
+                  type="button"
+                  onClick={handleImportSprint}
+                  disabled={!status.connected || importing || !selectedBoardId || !selectedSprintId}
+                >
+                  {importing ? "Importing..." : "Import Jira Sprint"}
+                </button>
+                <span className="integration-import-hint">
+                  {selectedBoardId && selectedSprintId ? "Ready for import" : "Select board and sprint"}
+                </span>
+              </div>
+            </div>
+          </Surface>
+        </div>
+      </section>
     </AppShell>
   );
 }
